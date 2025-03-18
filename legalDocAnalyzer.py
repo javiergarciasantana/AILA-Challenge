@@ -54,17 +54,14 @@ def load_objects(type, folder_path):
     range_objects = range(1, 201)
     obj_name = "S" 
 
-    for i in range_objects:  
-        file_name = f"{obj_name}{i}.txt"
-        file_path = os.path.join(folder_path, file_name)  
-        
-        if os.path.exists(file_path):  # Check if file exists
-            case_name = os.path.splitext(file_name)[0]  # Get filename without extension
-            docs[case_name] = read_file(file_path)  # Read file and store in dictionary
-        else:
-            print(f"Warning: {file_name} not found.")  # Handle missing files
-
-    return docs  
+  for i in range_objects:  
+      file_name = f"{obj_name}{i}.txt"
+      file_path = os.path.join(folder_path, file_name)  
+      
+      if os.path.exists(file_path):  # Check if file exists
+          case_name = os.path.splitext(file_name)[0]  # Get filename without extension
+          docs[case_name] = read_file(file_path)  # Read file and store in dictionary
+  return docs  
 
 
 def load_queries(file_path): 
@@ -94,5 +91,8 @@ r_priorcases = load_judgments("./archive/relevance_judgments_priorcases.txt")
 r_statutes = load_judgments("./archive/relevance_judgments_statutes.txt")
 
 
-
-print(r_statutes) 
+print("Case 1: " + str(cases["C1"]))
+print("Statute 200: " + str(statutes["S200"]))
+print("Query Q22: " + str(queries["AILA_Q22"]) + "\n")
+print("Relevance prriorcase Q4: " + str(r_priorcases["AILA_Q4"]) + "\n") 
+print("Relevance statute Q47" + str(r_statutes["AILA_Q47"])+ "\n") 
