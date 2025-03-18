@@ -12,11 +12,11 @@ This project is designed to read and load legal documents from text files. It pr
 
 1. Clone the repository:
   ```sh
-  git clone https://github.com/yourusername/legalDocAnalyzer.git
+  git clone https://github.com/javiergarciasantana/AILA-Challenge.git
   ```
 2. Navigate to the project directory:
   ```sh
-  cd legalDocAnalyzer
+  cd AILA-Challenge
   ```
 
 ## Usage
