@@ -1,4 +1,4 @@
-from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType
+from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 from auxfunctions import load_embeddings
 import numpy as np
 import pandas as pd
@@ -41,9 +41,14 @@ def main():
   print("Succesfully connected to milvus container!")
 
   meta_df, embeddings = load_embeddings()
-  # store_data(meta_df, embeddings)    
 
-  collection = Collection("legal_docs")
+  if not utility.has_collection("legal_docs"):
+      store_data(meta_df, embeddings)
+      print("Collection created and data stored.")
+  else:
+      print("Collection already exists, skipping data insertion.")
+      collection = Collection("legal_docs")
+    
   index_params = {
     "metric_type": "IP",        # inner product similarity (the higher the better)
     "index_type": "IVF_FLAT",   # a clustering index type (medium datasets)

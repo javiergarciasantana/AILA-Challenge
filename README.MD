@@ -1,11 +1,17 @@
 # Legal Document Analyzer
+## Introduction
 
-This project is designed to read and load legal documents from text files. It provides functions to read the content of a file and load multiple files into a dictionary, categorized as "casedocs" or "statutes".
+For this project, it is intended to create embeddings of casedocs and statutes provided in the AILA challenge so that they are stored with milvus and the developed RAG can make consultations on the data that is more similar whithin each other to obtain an appropiate response. In said challenge we ought to optimize this Retrieval-Augmented Generation system until the responses obtained matched the desired results.
+
+Moreover, some simple tests are already implemented to test the similaries between a query(in this case one of the chunks of a document) and the database.
 
 ## Table of Contents
 - [Installation](#installation)
 - [Usage](#usage)
-- [Functions](#functions)
+- [Preprocessing](#preprocessing)
+- [Data Dumping](#data-dumping)
+- [Testing](#testing)
+- [Functions](#utility-and-data-handling-functions)
 - [License](#license)
 
 ## Installation
@@ -18,6 +24,20 @@ This project is designed to read and load legal documents from text files. It pr
   ```sh
   cd AILA-Challenge
   ```
+3. Install Docker locally in your machine:
+  ```sh
+  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  ```
+4. Using `docker-compose.yml`run:
+  ```sh
+  docker compose up -d
+  ```
+5. Now you can test its connection by creating a new file and running:
+    ```python
+    connections.connect("default", host="localhost", port="19530")
+    print("Succesfully connected to milvus container!")
+    ````
+
 
 ## Usage
 
@@ -28,52 +48,227 @@ This project is designed to read and load legal documents from text files. It pr
   - `./archive/relevance_judgments_priorcases.txt`
   - `./archive/relevance_judgments_statutes.txt`
 
-2. Run the script:
-  ```sh
-  python3 legalDocAnalyzer.py
+
+
+## Preprocessing data
+  Firsly, we need to so some preprocessing, hence the file `preprocessing.py`.
+  Here we simply get the casedocs and statutes from the archive dir with the func `load_docs()`. Then we need to crea a list of dictionaries to store our data properly. We first append the casedocs and then the statutes. This way we prepair it for chunking. This means we split each doc in smaller pieces so that the embedding can be done well. 
+
+  ```python
+  text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+chunked_docs = []
+for doc in docs:
+    chunks = text_splitter.split_text(doc["text"])
+    for i, chunk in enumerate(chunks):
+        chunked_docs.append({
+            "text": chunk,
+            "type": doc["type"],
+            "id": f"{doc['id']}_chunk{i}"
+        })
+  ```
+  Here we simply use the `RecursiveCharacterTextSplitter` Class func to split the docs. Another thing that we need to keep track of is which part corresponds to what, meaning we need to know what document exactly and what chunk of that document was used to obtain a response. Therefore we add what we call metadata, each divided part is a `chunk`, has a `type`(casedoc or statute) and an `id`(the casedoc or statute number).
+
+  Now with the list of docs, we will embed each element of the list, which simply means we will assign a 3-dimendional value to all the chunks, the parts that refer to similar information, will be closer in the 3d space.
+
+  For this, another Class is used `SentenceTransformer`, instead of building an embedding to save some time. If they were to be tuned for our specific domain, a model could be built.
+
+  ```python
+    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+    def embed_text(texts):
+        return model.encode(texts, 
+        batch_size=64, 
+        show_progress_bar=True, 
+        convert_to_numpy=True)
+
+    texts = [d["text"] for d in chunked_docs]
+    embeddings = embed_text(texts)
   ```
 
-3. The script will output the content of specific cases, statutes, queries, and relevance judgments.
+  After this, the embeddings are stored in 2 `.tsv` for visualization and further use when loading into milvus db.
 
-```bash
-javiersantana@Macbook-de-Colu-2 AILA-Challenge % python3 legalDocAnalyzer.py
-Case 1: Masud Khan v State Of Uttar Pradesh
-Supreme Court of India
+  ```python
+    def save_embeddings(embeddings, chunked_docs):
+      try:
+  
+          # 1. Save embeddings as a TSV file
+          np.savetxt("export/embeddings.tsv", np.array(embeddings), delimiter="\t")
+          print("✅ Embeddings saved successfully.")
 
-26 September 1973
-Writ Petition No. 117 of 1973
-The Judgment was delivered by : A. Alagiriswami, J.
-1.  Petitioner Masud Khan prays for his release on the ground that he, an Indian citizen has been illegally arrested and confined to, jail under Paragraph 5 of the Foreigners (Internment) Order, 1962. He had come to India from Pakistan on the basis of a Pakistani passport dated 137-1954and Indian visa dated 9-4-1956. In his application for visa he had stated that he had migrated to Pakistan in 1948 and was in Government service in Pakistan in P.W.D. as a Darogha and had given his permanent address as Hyderabad (Sind).
-2.  If these statements were correct the petitioner would clearly be a Pakistani national. When this fact was brought out in the counter affidavit filled on behalf of the respondent, the petitioner filed a further affidavit stating that he was appointed as a Police Constable in Hasanganj Police Station, District Fatehpur, U.P. in February 1947 and continued as a Police Constable till the middle of 1950 when he was dismissed from service, and that he went to Pakistan in the year 1951.In the reply affidavit filed on behalf of the respondent it is stated that one Md. Masood Khan son of Zahoor Khan was enrolled as Police Constable on 16-9-1947 and he was discharged from service on 20-5-1949. It is fairly clear that this information culled from the English Order Book from 1-101947 to 27-12-1951 refers to the petitioner. While, therefore, it is established that the petitioner did not go to Pakistan in 1948, it cannot be said that it has been established that the petitioner went to Pakistan only in 1951.When he went to Pakistan is a matter peculiarly within his knowledge and the produced no evidence in support of that statement.
-3.  Considering the frequent change of ground which the petitioner has resorted to, a mere statement from him cannot be accepted as true. Nor can we accept his contention that it is for the respondent to establish that lie did not go to Pakistan in 1951 but that he went on some other date. The petitioner has also alleged that he was married in U.P. on 25th December, 1949.Even assuming that this statement is correct; the petitioner cannot establish that he is a citizen of India unless lie succeeds in establishing that he was in India on 26-1-1950. If he bad been in India on 26-1-1950 but had gone to Pakistan in 1951 it would be for the Central Government to decide whether he is a Pakistani national or an Indian citizen even though he may have come to India on a Pakistani passport in 1956. That question does not arise here.
-4.  We are not prepared to assume that the petitioner should be deemed to have been present in India on 26-1-1950, as was urged on behalf of the petitioner. There is no room for any such presumption. Under s-9 of the Foreigners Act whenever a question arises whether a person is or is not a foreigner the onus of proving that he is not a foreigner lies upon him. The burden is therefore, upon the petitioner to establish that be is a citizen of India in the manner claimed by him and therefore be is not a foreigner. This burden not having been discharged by the petitioner it should be held that he is a foreigner and his claim that he is an Indian citizen cannot be dealt with under the Foreigners (Internment) Order, 1962 must be rejected.
-5.  It appears, however, that in 1960 he had been prosecuted before the Sub-Divisional Magistrate, Fatehpur under s. 14 of the Foreigner--, Act and was acquitted on the ground that he was not a foreigner. It was therefore contended that the question whether the petitioner is -a foreigner or not is a matter of issue estoppels. The decision that he was not a foreigner seems to have been based on the decision of the Allahabad High Court in Mohd. Hanif Khan v. State (AIR 1960 All. 434). 1959 Indlaw ALL 154It was held there that a Pakistani national who entered into India before the amendment to the Foreigners Act in 1957, when he could not be considered to be a foreigner, could not be so held because of that amendment. That decision was that of a learned Single Judge. On the point at issue he differed from an earlier decision of a learned Single Judge of the same Court in Ali Sher v. The State (AIR 1960 All. 431). 1959 Indlaw ALL 153But he decided that case before him on a different point and did not think it necessary to refer the case before him to a Bench for considering which of the two decisions was correct on the question regarding the nationality of a person who came to India on a Pakistani passport before 1957. There are thus two conflicting decisions of the same court on the same point and the Magistrate who decided the petitioner's case followed one of them.
-6.  But that apart, this matter could bedecided on another point.. The question of issue-estoppels has been considered by this Court in Pritam Singh v. State, of Punjab (AIR1956 SC 415), 1955 Indlaw SC 111 Manipur Administration v. Thokchom, Bira Singh (1964 7 SCR 123) 1964 Indlaw SC 413 and Piara Singh S. State of Punjab. Issue-estoppels arises only if the earlier as well as the subsequent proceedings were criminal prosecutions. In the present case while the earlier one was a criminal prosecution the present is merely an action taken, under the Foreigners (Internment) Order for the purpose of deporting the petitioner out of India.
-7.  It is nota criminal prosecution. The principle of issue estoppels is simply this : that where an issue of fact has been tried by a competent court on a former occasion and a finding has been reached in favored an accused, such a finding would constitute an estoppels or res judicator against the prosecution not as a bar to the trial and conviction of the accused for a different or distinct offence but as precluding the reception of evidence to disturb that finding of fact when the accused is tried subsequently, even for different offence which might be permitted by law. Pritam Singh's case 1955 Indlaw SC 111 (supra) was based on the decision of the Privy Council in Sambasivam v. Public, Prosecutor, Federation of Malaya (1950 A.C. 458). In that case Lord McDermott speaking for the Board said:
-"The effect of a verdict of acquittal pronounced by a competent court on a lawful charge and after a lawful trial is not completely stated by saying that the person acquitted cannot be tried again for the same offence. To that it must be added that the verdict is binding and conclusive in all subsequent proceedings between the parties to the adjudication."
-It should bekept clearly in mind that the proceeding referred to herein is a criminal prosecution. The plea of issue-estoppels not the same as the, plea of double jeopardy or aura foist acquit. In The King v. Wilkes (77 C.L.R.511)
-Divon, J.
-8.  Referring to the question of issue estoppel said. view that there is an issue estoppels, if it appears by record of itself or as explained by proper evidence, that the same point was determined in favour of a prisoner in a previous criminal trial which is brought in issue on a second criminal trial of the same prisoners There must be prior proceeding determined against the Crown necessarily involving an issue which again arises in a subsequent proceeding by the Crown against the same prisoner. The allegation of the Crown in the subsequent proceeding must itself be inconsistent with the acquittal of the prisoner in the previous proceeding. But if such a condition of affairs arises I see no reason why the ordinary rules of issue-estoppels should not apply Issue-estoppels concerned with the judicial establishment of a proposition of law or fact between parties. It depends upon well-known doctrines which control the reiteration of issues which are settled by prior litigation."
-"The emphasis here again would be seen to be on the determination of, criminal liability. In Marz v. The Queen (96 C.L.R. 62) the High Court of Australia said "The Crown is as much precluded by an estoppels by judgment in criminal proceedings as is a subject in civil proceedings The laws which gives effect to issue estoppels is not concerned with the correctness or incorrectness of the finding which amounts to an estoppels, still less with the process of reasoning by which the finding was reached. in fact It is enough that an issue or issues have been distinctly raised or found. Once that is done, then, so long as the finding stands, if there be any subsequent litigation between the same parties, no allegations legally inconsistent with the finding, may be made by one of them against the other."
-Here again it is to be remembered that the principle applies to two criminal proceedings and the proceeding with which we are now concerned is not a criminal proceeding. We therefore hold that there is no substance in this contention.
+          # 2. Save metadata (text + type + id) as TSV
+          metadata_df = pd.DataFrame({
+              "id": [d["id"] for d in chunked_docs],
+              "type": [d["type"] for d in chunked_docs],
+              "text": [d["text"][:200].replace("\n", " ") for d in chunked_docs]  # truncate for readability
+          })
+          metadata_df.to_csv("export/metadata.tsv", sep="\t", index=False)
+          print("✅ Metadata saved successfully.")
 
-Statute 200: Title: Savings
-Desc: (1) Nothing in this Act shall affect section 25 of the Indian Contract Act, 1872 (9 of 1872). (2) Where any special or local law prescribes for any suit, appeal or application a period of limitation different from the period prescribed by the Schedule, the provisions of section 3 shall apply as if such period were the period prescribed by the Schedule and for the purpose of determining any period of limitation prescribed for any suit, appeal or application by any special or local law, the provisions contained in sections 4 to 24 (inclusive) shall apply only insofar as, and to the extent to which, they are not expressly excluded by such special or local law. (3) Save as otherwise provided in any law for the time, being in force with respect to marriage and divorce, no thing in this Act shall apply to any suit or other proceeding under any such law. (4) Sections 25 and 26 and the definition of "easement" in section 2 shall not apply to cases arising in the territories to which the Indian Easements Act, 1882 (5 of 1882), may for the time being extend.
+          return True  # indicate success
 
-Query Q22: Assailing the legal acceptability of the judgment and order passed by the High Court where it has given endorsement to the judgment passed by the learned Additional Sessions Judge wherein the learned trial Judge had found the appellants guilty of the offences and imposed the sentence of rigorous imprisonment of seven years and a fine of Rs.1,000/- on the first score, five years rigorous imprisonment and a fine of Rs.1,000/- on the second score, eighteen months rigorous imprisonment and a fine of Rs.500/- on the third count and six months rigorous imprisonment and a fine of Rs.250/- on the fourth count with the default clause for the fine amount in respect of each of the offences. The learned trial Judge stipulated that all the sentences shall be concurrent. Filtering the unnecessary details, the prosecution case, in brief, is that the marriage between the appellant No. 1 and deceased  P1, sister of the informant, PW-2, was solemnized on 24.9.1997. After the marriage the deceased stayed with her husband and the mother-in-law, the appellant No.2 herein, at the matrimonial home. In the wedlock, two children, one son and a daughter were born. On 11.9.2001, the informant, brother of the deceased, got a telephonic call from the accused No. 1 that his sister  P1 had committed suicide. On receipt of the telephone call came along with his friend, P2, PW-20, and at that juncture, the husband of  P1,  P3, informed that the deceased was fed up with the constant ill-health of her children and the said frustration had led her to commit suicide by tying a 'dupatta' around her neck. The brother of the deceased did not believe the version of  P3, and lodged an FIR alleging that the husband and the mother-in-law of the deceased, after the marriage, had been constantly asking for dowry of Rs.2 lacs from the father of the deceased, but as the said demand could not be satisfied due to the financial condition of the father, the husband and his mother started ill-treating her in the matrimonial home and being unable to tolerate the physical and mental torture she was compelled to commit suicide. Be it noted, as the death was unnatural, the police had sent the dead body for post mortem and the doctor conducting the autopsy opined that the death was due to suicide. After the criminal law was set in motion on the base of the FIR lodged by the brother, the investigating officer examined number of witnesses and after completing all the formalities laid the charge sheet before the competent Court, who, in turn, committed the matter to the Court of Session. The accused persons denied the allegations and claimed to be tried. The prosecution, in order to establish the charges levelled against the accused persons, examined 22 witnesses and got marked number of documents. The defence chose not to adduce any evidence. 4. The learned trial Judge principally posed four questions, namely, whether the accused persons had inflicted unbearable torture on the deceased as well as caused mental harassment to make themselves liable for punishment; whether the material brought on record established the offence; whether the physical and mental torture on the deceased compelled her to commit suicide on 11.9.2001 as a consequence of which the accused persons had become liable to be convicted; and whether the accused persons had demanded a sum of Rs.2 lacs towards dowry from the parents of  P1 so as to be found guilty. The learned trial Judge answered all the questions in the affirmative and opined that the prosecution had been able to prove the offences to the hilt and, accordingly, imposed the sentence as stated hereinbefore. Grieved by the judgment of conviction and the order of sentence the appellants filed an appeal. The High Court at the stage of admission had suo motu issued notice for enhancement of sentence. The State had appealed for the self-same purpose. The appeals and the revision application were disposed of by a common judgment dated 6.9.2007 whereby the Division Bench of the High Court concurred with the view expressed by the learned trial Judge and, accordingly, dismissed the appeals preferred by the accused as well as by the State and resultantly suo motu by the High Court also stood dismissed. The non-success in the appeal has compelled the accused-appellants to prefer this appeal by special leave.
+      except Exception as e:
+          print(f"❌ Error while saving embeddings or metadata: {e}")
+          return False  # indicate failure
+  ```
 
-Relevance prriorcase Q4: [('Q0', 'C182')]
+## Data dumping
+
+In this step we simply load the previously generated `.tsv` files into memory with one of the helper functions, then we connect to the milvus container that we previously created. 
+
+So that we are not loading the same data onto the container over and over, we  simply check if a collection is created and if not, we dump the data:
+
+```python
+    if not utility.has_collection("legal_docs"):
+      store_data(meta_df, embeddings)
+      print("Collection created and data stored.")
+  else:
+      print("Collection already exists, skipping data insertion.")
+      collection = Collection("legal_docs")
 ```
 
-## Functions
+When we go to the `store_data()` func, we firstly need to create a list of `FieldSchema`, one for each of the metadata:
 
-- `read_file(file_path)`: Reads the content of a file.
-- `process_query_to_dict(line)`: Processes a query line into a dictionary.
-- `process_judgment_to_dict(line, result_dict)`: Processes a judgment line and updates the result dictionary.
-- `load_objects(type, folder_path)`: Loads documents of a specified type from a folder.
-- `load_queries(file_path)`: Loads queries from a file.
-- `load_judgments(file_path)`: Loads judgments from a file.
+```python
+
+  fields = [
+      FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=200),
+      FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),  # adjust dim(embeddings.shape())
+      FieldSchema(name="type", dtype=DataType.VARCHAR, max_length=20)
+  ]
+```
+
+This is just to define our collection, which will be created next. take it as atributes for each element of the database. Also, worth commenting is the `dim` var wich corresponds to the with of the embeddings, so that we know how big each vector is.
+
+As promised, next up is the collection:
+
+```python
+schema = CollectionSchema(fields, description="Legal RAG embeddings")
+
+  # Create the collection
+  collection = Collection("legal_docs", schema)
+  print("Collection ", collection.name, " created")
+```
+
+Once this molded container to fit our data is created, we need to dump the data in batches not to exceed the buffer. Here we will go for `batch=500`. It is required we do that for each field:
+
+```python
+
+  for i in range(0, len(embeddings), batch_size):
+      batch_ids = meta_df["id"][i:i+batch_size].tolist()
+      batch_embeddings = embeddings[i:i+batch_size].tolist()
+      batch_types = meta_df["type"][i:i+batch_size].tolist() if "type" in meta_df.columns else ["unknown"] * len(batch_ids)
+
+      collection.insert([batch_ids, batch_embeddings, batch_types])
+```
+Milvus stores that data in memory first (in a write buffer). It does not immediately persist it to disk or make it visible to search queries. This is why we need to add the line `collection.flush()`.
+
+
+## Testing(To be expanded soon)
+
+### Similarity test
+
+```python
+
+index_params = {
+    "metric_type": "IP",        # inner product similarity (the higher the better)
+    "index_type": "IVF_FLAT",   # a clustering index type (medium datasets)
+    "params": {"nlist": int(np.sqrt(collection.num_entities))}    # number of clusters to create, good heuristic -> nlist = int(sqrt(num_vectors))
+  }
+
+  collection.create_index(field_name="embedding", index_params=index_params)
+  collection.load() # loads the indexed data into memory -> ready to search
+  
+  query_vector = embeddings[0].tolist() # -> The embedding of C1_chunk0     
+  
+  # Here we just do a very simple search to test similarity
+  results = collection.search(
+    data=[query_vector],             # must be a list of vectors
+    anns_field="embedding",          # the field to search
+    param={"nprobe": 10},            # how many clusters to probe
+    limit=5,                         # how many nearest neighbors to return
+    output_fields=["id", "type"]     # extra metadata to return
+  )
+  
+  print("\nTest Results\n")
+  # The top-5 most semantically similar embeddings are these, with their similarity scores.
+  for hit in results[0]:
+    print(f"ID: {hit.id} | Score: {hit.distance:.4f}")
+```
+### Similarity test result(C1_chunk0 as query)
+
+```bash
+Test Results
+
+ID: C1_chunk0 | Score: 1.0000
+ID: C1204_chunk0 | Score: 0.8580
+ID: C463_chunk0 | Score: 0.8482
+ID: C2050_chunk0 | Score: 0.8476
+ID: C2536_chunk0 | Score: 0.8467
+```
+
+## Utility and Data Handling Functions
+
+This module provides a set of helper functions for loading, processing, and managing legal documents, queries, judgments, and embeddings.  
+
+---
+
+### File Reading and Parsing
+
+- **`read_file(file_path)`**  
+  Reads the content of a text file and returns it as a string.
+
+- **`process_query_to_dict(line)`**  
+  Converts a line from the queries file into a dictionary entry.  
+  Each line is expected to have the format `KEY||VALUE`.
+
+- **`process_judgment_to_dict(line, result_dict)`**  
+  Parses a relevance judgment line (with 4 whitespace-separated columns) and updates the result dictionary  
+  with tuples of related case or statute identifiers where relevance equals `1`.
+
+---
+
+### Document and Query Loading
+
+- **`load_objects(type, folder_path)`**  
+  Loads legal documents of a given type (`"casedocs"` or `"statutes"`) from a specified folder.  
+  Each document is stored in a dictionary keyed by its file name (without extension).
+
+- **`load_queries(file_path)`**  
+  Reads and processes all query lines from a text file into a dictionary,  
+  using `process_query_to_dict()` to handle formatting.
+
+- **`load_judgments(file_path)`**  
+  Loads and parses the relevance judgment file into a dictionary,  
+  where each key corresponds to a query ID and values are lists of relevant case or statute pairs.
+
+---
+
+### Visualization and Export
+
+- **`visualize_docs(docs)`**  
+  Converts a list of document dictionaries into a Pandas DataFrame for inspection.  
+  Displays the first 10 entries with truncated text for readability.
+
+---
+
+### Embedding Management
+
+- **`save_embeddings(embeddings, chunked_docs)`**  
+  Saves model-generated embeddings and their metadata into TSV files located in the `export/` directory.  
+  - **`embeddings.tsv`** stores numerical vector representations.  
+  - **`metadata.tsv`** stores related text snippets, types, and IDs.  
+  Returns `True` if successful, otherwise prints an error and returns `False`.
+
+- **`load_embeddings()`**  
+  Loads the saved embeddings and metadata from TSV files.  
+  Returns both as `(meta_df, embeddings)` and prints the shape of the embeddings for verification.
+
+---
+
+These functions form the foundation for the preprocessing and data management steps used in building the RAG (Retrieval-Augmented Generation) pipeline.
 
 ## References
 
 * [AILA Database]https://www.kaggle.com/datasets/ananyapam7/legalai/data
+* [Milvus documentation page]https://milvus.io/docs/quickstart.md
+* [Setting Up Milvus container in Docker]https://www.youtube.com/watch?v=K0ZayH0n7sI
