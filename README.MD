@@ -93,7 +93,7 @@ for doc in docs:
   ```
   Here we simply use the `RecursiveCharacterTextSplitter` Class func to split the docs. Another thing that we need to keep track of is which part corresponds to what, meaning we need to know what document exactly and what chunk of that document was used to obtain a response. Therefore we add what we call metadata, each divided part is a `chunk`, has a `type`(casedoc or statute) and an `id`(the casedoc or statute number).
 
-  Now with the list of docs, we will embed each element of the list, which simply means we will assign a 3-dimendional value to all the chunks, the parts that refer to similar information, will be closer in the 3d space.
+  Now with the list of docs, we will embed each element of the list, which simply means we will assign a high-dimendional value(vector) to all the chunks, the parts that refer to similar information, will point to a similar direction, we know this when we obtain the inner product of the query vector and each of the ones that we are compairing it to.
 
   For this, another Class is used `SentenceTransformer`, instead of building an embedding to save some time. If they were to be tuned for our specific domain, a model could be built.
 
