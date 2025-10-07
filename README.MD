@@ -24,20 +24,34 @@ Moreover, some simple tests are already implemented to test the similaries betwe
   ```sh
   cd AILA-Challenge
   ```
-3. Install Docker locally in your machine:
+3. Create a virtual environment and activate it:
+  ```sh
+  python -m venv .venv
+  source .venv/bin/activate   # on macOS/Linux
+  ```
+4. Install the required libraries
+  ```sh
+  pip install -r requirements.txt
+  ```
+5. Install Docker locally in your machine:
   ```sh
   sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   ```
-4. Using `docker-compose.yml`run:
+6. Using `docker-compose.yml`run:
   ```sh
   docker compose up -d
   ```
-5. Now you can test its connection by creating a new file and running:
+
+7. To check if the container is running use:
+
+  ```sh
+  docker ps
+  ```
+8. Now you can test its connection by creating a new file and running:
     ```python
     connections.connect("default", host="localhost", port="19530")
     print("Succesfully connected to milvus container!")
     ````
-
 
 ## Usage
 
@@ -47,8 +61,19 @@ Moreover, some simple tests are already implemented to test the similaries betwe
   - `./archive/Query_doc.txt`
   - `./archive/relevance_judgments_priorcases.txt`
   - `./archive/relevance_judgments_statutes.txt`
+2. To preprocess the data simply run `preprocessing.py``
+
+  ```sh
+  python3 preprocessing.py
+  ```
+3. And to load the data/run the tests:
+
+  ```sh
+  python3 milvus-loader.py
+  ```
 
 
+2. To preprocess the
 
 ## Preprocessing data
   Firsly, we need to so some preprocessing, hence the file `preprocessing.py`.
@@ -269,6 +294,7 @@ These functions form the foundation for the preprocessing and data management st
 
 ## References
 
-* [AILA Database]https://www.kaggle.com/datasets/ananyapam7/legalai/data
-* [Milvus documentation page]https://milvus.io/docs/quickstart.md
-* [Setting Up Milvus container in Docker]https://www.youtube.com/watch?v=K0ZayH0n7sI
+* [AILA Database](https://www.kaggle.com/datasets/ananyapam7/legalai/data)
+* [Milvus documentation page](https://milvus.io/docs/quickstart.md)
+* [Milvus Collections](https://milvus.io/docs/v2.2.x/check_collection.md)
+* [Setting Up Milvus container in Docker](https://www.youtube.com/watch?v=K0ZayH0n7sI)
