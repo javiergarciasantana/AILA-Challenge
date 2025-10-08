@@ -250,13 +250,13 @@ You choose one embedding as the query:
 query_vector = embeddings[0].tolist()
 ```
 
-That’s our C1_chunk0 vector — Milvus will find vectors with similar direction.
+That's our `C1_chunk0` vector — Milvus will find vectors with similar direction.
 
 #### Step 3. nprobe controls how many clusters to search
 
 You set:
 
-param={"nprobe": 10}
+`param={"nprobe": 10}`
 
 
 Milvus will:
@@ -266,6 +266,16 @@ Compare your query to all cluster centroids.
 Select the 10 closest clusters (out of the total nlist).
 
 Search only within those clusters for the top matches.
+
+```py
+  results = collection.search(
+    data=[query_vector],             # must be a list of vectors
+    anns_field="embedding",          # the field to search
+    param={"nprobe": 10},            # how many clusters to probe
+    limit=5,                         # how many nearest neighbors to return
+    output_fields=["id", "type"]     # extra metadata to return
+  )
+```
 
 
 * Higher nprobe = more accurate (but slower).
@@ -298,15 +308,15 @@ and returns the top N (you chose limit=5). This is done firstly just to verify t
 
 #### Conceptual flow
 ```mermaid
-flowchart TD;
-    A[Your stored embeddings<br/>(clustered into nlist groups)];
-    A --> B[Build IVF_FLAT index];
-    B --> C[Query vector (C1_chunk0)<br/>Metric: Inner Product (IP)];
-    C --> D[Compare to cluster centroids];
-    D --> E[Choose nprobe = 10 clusters];
-    E --> F[Compute similarity (IP)<br/>inside those clusters only];
-    F --> G[Rank top 5 nearest items<br/>by highest similarity];
-    G --> H[Return results];
+flowchart TD
+    A[Your stored embeddings clustered into nlist groups]
+    A --> B[Build IVF_FLAT index]
+    B --> C[Query vector C1_chunk0<br/>Metric: Inner Product: IP]
+    C --> D[Compare to cluster centroids]
+    D --> E[Choose nprobe = 10 clusters]
+    E --> F[Compute similarity 'IP' inside those clusters only]
+    F --> G[Rank top 5 nearest items by highest similarity]
+    G --> H[Return results]
 ```
 
 
