@@ -1,5 +1,6 @@
 from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 from auxfunctions import load_embeddings
+from pick import pick
 import numpy as np
 import pandas as pd
 
@@ -40,7 +41,14 @@ def main():
   connections.connect("default", host="localhost", port="19530")
   print("Succesfully connected to milvus container!")
 
-  meta_df, embeddings = load_embeddings()
+  #Choose which embeddings to use
+
+  title = 'Please choose your preferred embedding model: '
+  options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1']
+
+  selected_model, index = pick(options, title, indicator='=>', default_index=1)
+
+  meta_df, embeddings = load_embeddings(selected_model)
 
   if not utility.has_collection("legal_docs"):
       store_data(meta_df, embeddings)

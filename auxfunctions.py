@@ -94,34 +94,41 @@ def visualize_docs(docs):
   pd.set_option("display.max_colwidth", 100)  # show first 100 chars of text
   print(df_docs.head(10))
 
-def save_embeddings(embeddings, chunked_docs):
-    try:
- 
-        # 1. Save embeddings as a TSV file
-        np.savetxt("export/embeddings.tsv", np.array(embeddings), delimiter="\t")
-        print("✅ Embeddings saved successfully.")
+def save_embeddings(embeddings, chunked_docs, model):
+  dir_path = "export/" + model
 
-        # 2. Save metadata (text + type + id) as TSV
-        metadata_df = pd.DataFrame({
-            "id": [d["id"] for d in chunked_docs],
-            "type": [d["type"] for d in chunked_docs],
-            "text": [d["text"][:200].replace("\n", " ") for d in chunked_docs]  # truncate for readability
-        })
-        metadata_df.to_csv("export/metadata.tsv", sep="\t", index=False)
-        print("✅ Metadata saved successfully.")
+  try:
+      os.makedirs(dir_path, exist_ok=True)
+  except OSError as e:
+      print(f"Error: {e}")
+  try:
 
-        return True  # indicate success
+      # 1. Save embeddings as a TSV file
+      np.savetxt(dir_path + "/embeddings.tsv", np.array(embeddings), delimiter="\t")
+      print("✅ Embeddings saved successfully.")
 
-    except Exception as e:
-        print(f"❌ Error while saving embeddings or metadata: {e}")
-        return False  # indicate failure
+      # 2. Save metadata (text + type + id) as TSV
+      metadata_df = pd.DataFrame({
+          "id": [d["id"] for d in chunked_docs],
+          "type": [d["type"] for d in chunked_docs],
+          "text": [d["text"][:200].replace("\n", " ") for d in chunked_docs]  # truncate for readability
+      })
+      metadata_df.to_csv(dir_path + "/metadata.tsv", sep="\t", index=False)
+      print("✅ Metadata saved successfully.")
 
-def load_embeddings():
+      return True  # indicate success
+
+  except Exception as e:
+      print(f"❌ Error while saving embeddings or metadata: {e}")
+      return False  # indicate failure
+
+def load_embeddings(model):
+  dir_path = "export/" + model
    # Load metadata
-  meta_df = pd.read_csv("export/metadata.tsv", sep="\t")
+  meta_df = pd.read_csv(dir_path + "/metadata.tsv", sep="\t")
 
   # Load embeddings
-  embeddings = np.loadtxt("export/embeddings.tsv", delimiter="\t")
+  embeddings = np.loadtxt(dir_path + "/embeddings.tsv", delimiter="\t")
 
   # Verify alignment
   #print(meta_df.head())

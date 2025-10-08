@@ -5,6 +5,11 @@ For this project, it is intended to create embeddings of casedocs and statutes p
 
 Moreover, some simple tests are already implemented to test the similaries between a query(in this case one of the chunks of a document) and the database.
 
+## Relevant Concepts
+
+-Cluster
+-Centroid
+
 ## Table of Contents
 - [Installation](#installation)
 - [Usage](#usage)
@@ -72,8 +77,7 @@ Moreover, some simple tests are already implemented to test the similaries betwe
   python3 milvus-loader.py
   ```
 
-
-2. To preprocess the
+## Docker arquitecture
 
 ## Preprocessing data
   Firsly, we need to so some preprocessing, hence the file `preprocessing.py`.
@@ -190,6 +194,123 @@ Milvus stores that data in memory first (in a write buffer). It does not immedia
 
 ## Testing(To be expanded soon)
 
+### How similarity search works
+As I explained earlier,  each text chunk (e.g., "C1_chunk0", "C1204_chunk0", etc.)
+is represented as a vector in a high-dimensional space.
+
+Visually, imagine each as a dot:
+
+⬤ = a vector (e.g. a text chunk embedding)
+
+```md
+
+        ⬤⬤       ⬤
+   ⬤⬤⬤      ⬤⬤⬤⬤⬤
+         ⬤
+⬤⬤      ⬤⬤⬤
+```
+
+That’s your vector space — thousands of embeddings scattered in a 384-D world (we show 2D here).
+
+#### Step 1. IVF_FLAT creates clusters (index building)
+
+
+IVF_FLAT = Inverted File with Flat vectors
+
+When you create the index:
+
+```python
+index_params = {
+    "index_type": "IVF_FLAT",
+    "params": {"nlist": int(np.sqrt(num_vectors))}
+}
+```
+
+Milvus divides all embeddings into nlist clusters (for example, 100 clusters).
+
+It finds nlist centroids (think “average positions”).
+
+Each embedding is assigned to the nearest centroid.
+
+```pgsql
+Cluster 1      Cluster 2       Cluster 3
+  ⬤⬤⬤        ⬤⬤⬤          ⬤⬤⬤
+   ⬤            ⬤⬤           ⬤⬤⬤
+```
+
+Why?
+Because when searching, you don’t want to compare the query with every single vector.
+Instead, you’ll look only inside a few relevant clusters.
+
+#### Step 2. You query with one vector
+
+You choose one embedding as the query:
+
+```py
+query_vector = embeddings[0].tolist()
+```
+
+That’s our C1_chunk0 vector — Milvus will find vectors with similar direction.
+
+#### Step 3. nprobe controls how many clusters to search
+
+You set:
+
+param={"nprobe": 10}
+
+
+Milvus will:
+
+Compare your query to all cluster centroids.
+
+Select the 10 closest clusters (out of the total nlist).
+
+Search only within those clusters for the top matches.
+
+
+* Higher nprobe = more accurate (but slower).
+
+* Lower nprobe = faster (but less thorough).
+
+#### Step 4. Inner Product similarity (metric_type="IP")
+
+For each candidate vector inside those clusters,
+Milvus computes the inner product with the query vector:
+
+ $`similarity=𝑞⋅𝑥=∥𝑞∥∥𝑥∥cos(𝜃)`$
+
+
+Since most embeddings are normalized,
+this is equivalent to cosine similarity (higher = more similar).
+
+#### Step 6. Ranking and returning results
+
+Milvus sorts all candidates by similarity score
+and returns the top N (you chose limit=5). This is done firstly just to verify that the search works properly:
+
+|Rank | ID             | Type     | Score (IP) |
+|-----|----------------|----------|------------|
+|1    | C1_chunk0      | casedoc  | 1.0000     |
+|2    | C1204_chunk0   | casedoc  | 0.8580     |
+|3    | C463_chunk0    | casedoc  | 0.8482     |
+|4    | C2050_chunk0   | casedoc  | 0.8476     |
+|5    | C2536_chunk0   | casedoc  | 0.8467     |
+
+#### Conceptual flow
+```mermaid
+flowchart TD;
+    A[Your stored embeddings<br/>(clustered into nlist groups)];
+    A --> B[Build IVF_FLAT index];
+    B --> C[Query vector (C1_chunk0)<br/>Metric: Inner Product (IP)];
+    C --> D[Compare to cluster centroids];
+    D --> E[Choose nprobe = 10 clusters];
+    E --> F[Compute similarity (IP)<br/>inside those clusters only];
+    F --> G[Rank top 5 nearest items<br/>by highest similarity];
+    G --> H[Return results];
+```
+
+
+
 ### Similarity test
 
 ```python
@@ -298,3 +419,4 @@ These functions form the foundation for the preprocessing and data management st
 * [Milvus documentation page](https://milvus.io/docs/quickstart.md)
 * [Milvus Collections](https://milvus.io/docs/v2.2.x/check_collection.md)
 * [Setting Up Milvus container in Docker](https://www.youtube.com/watch?v=K0ZayH0n7sI)
+* [Available pretrained embedding models](https://sbert.net/docs/sentence_transformer/pretrained_models.html)
