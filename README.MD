@@ -95,7 +95,21 @@ for doc in docs:
             "id": f"{doc['id']}_chunk{i}"
         })
   ```
-  Here we simply use the `RecursiveCharacterTextSplitter` Class func to split the docs. Another thing that we need to keep track of is which part corresponds to what, meaning we need to know what document exactly and what chunk of that document was used to obtain a response. Therefore we add what we call metadata, each divided part is a `chunk`, has a `type`(casedoc or statute) and an `id`(the casedoc or statute number).
+  Here we simply use the `RecursiveCharacterTextSplitter` Class func to split the docs. 
+  does not guarantee exactly 1000 characters per chunk.
+
+  It tries to:
+
+  * Respect natural language boundaries — like paragraphs, sentences, or words.
+
+  * Avoid breaking tokens mid-word or mid-sentence.
+
+  * Stay close to 1000 characters, but will make chunks shorter if splitting nicely requires it.
+
+  For instance, if a paragraph ends at 850 characters, the splitter will start a new chunk rather than slicing through the sentence to reach 1000.
+    
+  ---
+  Another thing that we need to keep track of is which part corresponds to what, meaning we need to know what document exactly and what chunk of that document was used to obtain a response. Therefore we add what we call metadata, each divided part is a `chunk`, has a `type`(casedoc or statute) and an `id`(the casedoc or statute number).
 
   Now with the list of docs, we will embed each element of the list, which simply means we will assign a high-dimendional value(vector) to all the chunks, the parts that refer to similar information, will point to a similar direction, we know this when we obtain the inner product of the query vector and each of the ones that we are compairing it to.
 

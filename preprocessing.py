@@ -21,7 +21,7 @@
 import os
 from pick import pick
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection
-from auxfunctions import load_objects, visualize_docs, save_embeddings
+from auxfunctions import load_objects, visualize_docs, save_embeddings, all_underscores
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
@@ -60,8 +60,8 @@ for doc in docs:
         chunked_docs.append({
             "text": chunk,
             "type": doc["type"],
-            "id": f"{doc['id']}",
-            "chunk": f"chunk{i}"
+            "id": doc["id"],
+            "chunk": f"chunk{i}" 
         })
 
 #visualize_docs(chunks)
@@ -70,13 +70,10 @@ print(f"Loaded {len(docs)} documents and split into {len(chunked_docs)} chunks."
 # --- 4. Generate Embeddings ---
 
 #Let the user choose the embedding model to use
-
-
 title = 'Please choose your preferred embedding model: '
 options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1']
 
 selected_model, index = pick(options, title, indicator='=>', default_index=1)
-
 
 # Load a free embedding model (runs locally)
 print("Running " + selected_model + " embedding model...\n")
@@ -92,4 +89,4 @@ texts = [d["text"] for d in chunked_docs]
 embeddings = embed_text(texts)
 
 print("Saving the embeddings into .tsv files...\n")
-save_embeddings(embeddings, chunked_docs, selected_model)
+save_embeddings(embeddings, chunked_docs, all_underscores(selected_model))

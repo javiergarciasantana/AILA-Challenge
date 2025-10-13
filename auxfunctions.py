@@ -94,6 +94,9 @@ def visualize_docs(docs):
   pd.set_option("display.max_colwidth", 100)  # show first 100 chars of text
   print(df_docs.head(10))
 
+def all_underscores(model_name):
+  return model_name.replace("-", "_")
+
 def save_embeddings(embeddings, chunked_docs, model):
   dir_path = "export/" + model
 
@@ -107,9 +110,10 @@ def save_embeddings(embeddings, chunked_docs, model):
       np.savetxt(dir_path + "/embeddings.tsv", np.array(embeddings), delimiter="\t")
       print("✅ Embeddings saved successfully.")
 
-      # 2. Save metadata (text + type + id) as TSV
+      # 2. Save metadata (text + type + id + chunk) as TSV
       metadata_df = pd.DataFrame({
           "id": [d["id"] for d in chunked_docs],
+          "chunk": [d["chunk"] for d in chunked_docs],
           "type": [d["type"] for d in chunked_docs],
           "text": [d["text"][:200].replace("\n", " ") for d in chunked_docs]  # truncate for readability
       })
@@ -124,11 +128,16 @@ def save_embeddings(embeddings, chunked_docs, model):
 
 def load_embeddings(model):
   dir_path = "export/" + model
-   # Load metadata
-  meta_df = pd.read_csv(dir_path + "/metadata.tsv", sep="\t")
+  try:
+    # Load metadata
+    meta_df = pd.read_csv(dir_path + "/metadata.tsv", sep="\t")
 
-  # Load embeddings
-  embeddings = np.loadtxt(dir_path + "/embeddings.tsv", delimiter="\t")
+    # Load embeddings
+    embeddings = np.loadtxt(dir_path + "/embeddings.tsv", delimiter="\t")
+
+  except Exception as e:
+      print(f"❌ Error while loading embeddings or metadata: {e}")
+      return False  # indicate failure
 
   # Verify alignment
   #print(meta_df.head())
