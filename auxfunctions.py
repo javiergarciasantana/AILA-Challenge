@@ -27,13 +27,14 @@ def read_file(file_path):
     content = file.read()  
   return content
 
-
 def process_query_to_dict(line):
-    parts = line.strip().split("||", 1)  # Split at '||', only once
-    if len(parts) == 2:  # Ensure there are exactly 2 parts
-        key, value = parts
-        return {key: value}
-    return {}  
+  parts = line.strip().split("||", 1)  # Split at '||', only once
+  if len(parts) == 2:  # Ensure there are exactly 2 parts
+    key, value = parts
+    #print(f"Key: {key}, Value: {value[0]}")  # Debugging: show the extracted key and value
+    return {key: value}
+  print("Line format is incorrect, returning empty dictionary.")  # Debugging: indicate incorrect format
+  return {}
 
 def process_judgment_to_dict(line, result_dict):
     parts = line.strip().split()  # Split by whitespace
@@ -72,7 +73,6 @@ def load_queries(file_path):
   queries = {}
   with open(file_path, 'r', encoding='utf-8') as file:
     for line in file:
-        line = file.readline() 
         queries.update(process_query_to_dict(line))
       
   return queries
@@ -81,7 +81,6 @@ def load_judgments(file_path):
   judgments = {}
   with open(file_path, 'r', encoding='utf-8') as file:
     for line in file:
-        line = file.readline() 
         process_judgment_to_dict(line, judgments)
       
   return judgments
@@ -97,7 +96,7 @@ def visualize_docs(docs):
 def all_underscores(model_name):
   return model_name.replace("-", "_")
 
-def save_embeddings(embeddings, chunked_docs, model):
+def save_embeddings_cs(embeddings, chunked_docs, model):
   dir_path = "export/" + model
 
   try:
@@ -126,6 +125,38 @@ def save_embeddings(embeddings, chunked_docs, model):
       print(f"❌ Error while saving embeddings or metadata: {e}")
       return False  # indicate failure
 
+def save_embeddings_q(embeddings, texts, ids, model):
+  dir_path = "export/queries/" + model
+
+  try:
+      os.makedirs(dir_path, exist_ok=True)
+  except OSError as e:
+      print(f"Error: {e}")
+
+  try:
+     
+    # Save embeddings as a TSV file
+    np.savetxt(dir_path + "/embeddings.tsv", np.array(embeddings), delimiter="\t")
+    print("✅ Embeddings saved successfully.")
+
+    # Prepare metadata
+    metadata_df = pd.DataFrame({
+        "id": ids,
+        "model": model,
+        "text": texts
+    })
+    metadata_df.to_csv(dir_path + "/metadata.tsv", sep="\t", index=False)
+    print("✅ Metadata saved successfully.")
+    print(f"✅ Done with {model}!")
+
+    return True
+  
+  except Exception as e:
+    print(f"❌ Error while saving embeddings or metadata of queries: {e}")
+    return False  # indicate failure
+
+  
+   
 def load_embeddings(model):
   dir_path = "export/" + model
   try:
@@ -141,7 +172,7 @@ def load_embeddings(model):
 
   # Verify alignment
   #print(meta_df.head())
-  print(embeddings.shape)
+  #print(embeddings.shape)
 
   # Return required data
   return meta_df, embeddings

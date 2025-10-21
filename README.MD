@@ -79,6 +79,74 @@ Moreover, some simple tests are already implemented to test the similaries betwe
 
 ## Docker arquitecture
 
+```mermaid
+
+graph TD
+    subgraph "User Application"
+        Client["milvus-loader.py"]
+    end
+
+    subgraph "Milvus Cluster"
+        Proxy["Proxy (Entry Point)"]
+        
+        subgraph "Coordinators"
+            RootCoord["Root Coordinator"]
+            QueryCoord["Query Coordinator"]
+            DataCoord["Data Coordinator"]
+            IndexCoord["Index Coordinator"]
+        end
+
+        subgraph "Worker Nodes"
+            QueryNode["Query Node"]
+            DataNode["Data Node"]
+            IndexNode["Index Node"]
+        end
+    end
+
+    subgraph "Storage Layer (from your 'volumes' folder)"
+        ETCD["etcd (Metadata Storage)"]
+        MinIO["MinIO (Object Storage)"]
+    end
+
+    %% Connections
+    Client --> Proxy
+
+    Proxy --> RootCoord
+    Proxy --> QueryCoord
+    Proxy --> DataCoord
+
+    RootCoord --- DataCoord
+    QueryCoord --- QueryNode
+    DataCoord --- DataNode
+    IndexCoord --- IndexNode
+
+    DataNode --> MinIO
+    IndexNode --> MinIO
+    QueryNode --> MinIO
+
+    RootCoord --> ETCD
+    QueryCoord --> ETCD
+    DataCoord --> ETCD
+    IndexCoord --> ETCD
+
+```
+Milvus Cluster: The core of the vector database, composed of several microservices that can be scaled independently.
+
+* Proxy: The public-facing entry point of the cluster. It receives all requests from your script, validates them, and routes them to the appropriate internal components.
+* Coordinators: The "brain" of the cluster, managing different aspects of the system.
+* Root Coordinator: Handles data definition tasks, such as creating or deleting collections and partitions.
+* Data Coordinator: Manages data manipulation, like insertions and deletions, and ensures data is flushed from memory to persistent storage.
+* Query Coordinator: Manages query tasks by distributing them to the Query Nodes for execution.
+* Index Coordinator: Manages the creation and maintenance of vector indexes.
+* Worker Nodes: The "muscle" of the cluster, performing the actual data processing and searching.
+* Data Node: Ingests and stores incoming vector data.
+* Index Node: Builds the vector indexes on the data segments to accelerate searches.
+* Query Node: Loads data segments and their indexes into memory to perform searches and queries.
+* Storage Layer: The persistent backend for Milvus, represented by your volumes directory.
+
+* etcd: A distributed key-value store used to save all metadata for the Milvus cluster. This includes collection schemas, index definitions, and the state of data segments. Your etcd directory contains its data files.
+* MinIO: An S3-compatible object storage service. Milvus uses it to store the actual raw data, including the vector embeddings and their index files. Your minio directory contains this data.
+
 ## Preprocessing data
   Firsly, we need to so some preprocessing, hence the file `preprocessing.py`.
   Here we simply get the casedocs and statutes from the archive dir with the func `load_docs()`. Then we need to crea a list of dictionaries to store our data properly. We first append the casedocs and then the statutes. This way we prepair it for chunking. This means we split each doc in smaller pieces so that the embedding can be done well. 
@@ -444,3 +512,4 @@ These functions form the foundation for the preprocessing and data management st
 * [Milvus Collections](https://milvus.io/docs/v2.2.x/check_collection.md)
 * [Setting Up Milvus container in Docker](https://www.youtube.com/watch?v=K0ZayH0n7sI)
 * [Available pretrained embedding models](https://sbert.net/docs/sentence_transformer/pretrained_models.html)
+* [How is the chunking done with `RecursiveCharacterTextSplitter`](http://python.langchain.com/docs/how_to/recursive_text_splitter/)
