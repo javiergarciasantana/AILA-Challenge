@@ -17,11 +17,15 @@
 # 10/03/2025 - Creacion (primera version) del codigo
 # 27/09/2025 - Implementación de librerías para vector database embedding
 
+from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 import pandas as pd
 import numpy as np
+import time
 import os
 
-
+# ==========================
+# File Reading and Processing
+# ==========================
 def read_file(file_path):
   with open(file_path, 'r', encoding='utf-8') as file:  
     content = file.read()  
@@ -96,6 +100,10 @@ def visualize_docs(docs):
 def all_underscores(model_name):
   return model_name.replace("-", "_")
 
+# ==========================
+# Embedding Saving and Loading
+# ==========================
+
 def save_embeddings_cs(embeddings, chunked_docs, model):
   dir_path = "export/" + model
 
@@ -156,7 +164,6 @@ def save_embeddings_q(embeddings, texts, ids, model):
     return False  # indicate failure
 
   
-   
 def load_embeddings(model):
   dir_path = "export/" + model
   try:
@@ -176,3 +183,38 @@ def load_embeddings(model):
 
   # Return required data
   return meta_df, embeddings
+
+# ===========================
+# Collection helper Functions
+# ===========================
+def ensure_index(collection_name):
+    collection = Collection(collection_name)
+
+    # Only create index if not already present
+    index_info = collection.indexes
+    if len(index_info) == 0:
+        num_entities = collection.num_entities
+        nlist = int(np.sqrt(num_entities)) if num_entities > 0 else 128
+
+        index_params = {
+            "metric_type": "IP",        # inner product similarity
+            "index_type": "IVF_FLAT",   # clustered flat index
+            "params": {"nlist": nlist}
+        }
+
+        collection.create_index(
+            field_name="embedding",
+            index_params=index_params
+        )
+        print(f"✅ Index created for collection {collection_name}")
+
+    collection.load()  # Load into memory for searching
+    return collection
+
+def visualize_collections():
+  collections = utility.list_collections()
+  print("\n📦 Collections in Milvus:")
+  for i, collection in enumerate(collections, start=1):
+     print(f"  {i}. {collection}")
+  print("\n✨ Total collections:", len(collections))
+  time.sleep(5)
