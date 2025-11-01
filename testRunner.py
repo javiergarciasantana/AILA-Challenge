@@ -2,6 +2,7 @@ from pymilvus import Collection, utility
 from auxfunctions import load_embeddings
 import pandas as pd
 import time
+import os
 
 class TestRunner:
     """A class to encapsulate Milvus similarity testing logic."""
@@ -12,7 +13,28 @@ class TestRunner:
             models (list): A list of model names to run tests against.
         """
         self.models = models
-
+    
+    def csv_print(self, model, results_df, filename):
+      """
+      Writes the similarity results to a CSV file with the model name as a header.
+      If the file does not exist, it creates a new one.
+      Args:
+        model (str): The name of the model.
+        results_df (pd.DataFrame): The DataFrame containing the results to be written.
+      """
+      file_path = f"tests/{filename}.csv"
+      try:
+        with open(file_path, 'w') as f:
+          # Write model name as a header and save to CSV
+          f.write(f"==={model}===\n")
+          results_df.to_csv(f, index=False)
+      except FileNotFoundError:
+        print(f"Directory for {file_path} not found. Creating it...")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w') as f:
+          f.write(f"==={model}===\n")
+          results_df.to_csv(f, index=False)
+      
     def run_simple_similarity(self):
         """
         Performs a simple similarity test for each model.
@@ -46,10 +68,7 @@ class TestRunner:
             print(f"\n--- Results for {model} ---")
             print(results_df)
 
-            with open("tests/similarity_results.csv", 'a') as f:
-                # Prepend model name and write to CSV
-                f.write(f"\n==={model}===\n")
-                results_df.to_csv(f, header=f.tell() < 20, index=False)
+            self.csv_print(model, results_df, "simple_similarity_results")
             
             collection.release()
 
@@ -77,7 +96,7 @@ class TestRunner:
             docs_collection = Collection(docs_col_name)
             docs_collection.load()
 
-            query_results = queries_collection.query(expr=None, output_fields=["id", "embedding"])
+            query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
             for q in query_results:
                 results = docs_collection.search(
                     data=[q["embedding"]],
@@ -90,6 +109,9 @@ class TestRunner:
                 print(f"\nQuery ID: {q['id']} (Model: {model_name})")
                 for i, hit in enumerate(results[0]):
                     print(f"  {i+1}. Match: {hit.id} | Score: {hit.distance:.4f}")
+                
+                results_df = pd.DataFrame(results)
+                self.csv_print(model_name, results_df, "complex_similarity_results")
             
             queries_collection.release()
             docs_collection.release()
