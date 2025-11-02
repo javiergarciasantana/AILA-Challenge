@@ -41,7 +41,7 @@ class CaseStatuteStorer:
             collection.insert([batch_ids, batch_chunks, batch_types, batch_embeddings])
 
         collection.flush()
-        ensure_index(collection.name)
+        ensure_index(collection.name, "IVF_FLAT")
         print(f"Data inserted and indexed in '{self.collection_name}'.")
 
 
@@ -81,5 +81,7 @@ class QueryStorer:
 
         collection.insert([ids, model_col, embeddings.tolist()])
         collection.flush()
+        ensure_index(collection.name, "FLAT")
+
         print(f"Test queries inserted into '{collection_name}'.")
         time.sleep(1) # Brief pause

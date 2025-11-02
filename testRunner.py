@@ -3,6 +3,7 @@ from auxfunctions import load_embeddings
 import pandas as pd
 import time
 import os
+import re
 
 class TestRunner:
     """A class to encapsulate Milvus similarity testing logic."""
@@ -14,27 +15,28 @@ class TestRunner:
         """
         self.models = models
     
-    def csv_print(self, model, results_df, filename):
+    def csv_print(self, model, results_df, filename, query_id=''):
       """
-      Writes the similarity results to a CSV file with the model name as a header.
+      Appends the similarity results to a CSV file with the model name as a header.
       If the file does not exist, it creates a new one.
       Args:
         model (str): The name of the model.
         results_df (pd.DataFrame): The DataFrame containing the results to be written.
       """
       file_path = f"tests/{filename}.csv"
+      
       try:
-        with open(file_path, 'w') as f:
-          # Write model name as a header and save to CSV
-          f.write(f"==={model}===\n")
-          results_df.to_csv(f, index=False)
+        with open(file_path, 'a') as f:
+          # Write model name as a header and append to CSV
+          f.write(f"==={query_id}({model})===\n")
+          results_df.to_csv(f, index=False, header=False)
       except FileNotFoundError:
         print(f"Directory for {file_path} not found. Creating it...")
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'w') as f:
+        with open(file_path, 'a') as f:
           f.write(f"==={model}===\n")
-          results_df.to_csv(f, index=False)
-      
+          results_df.to_csv(f, index=False, header=False)
+          
     def run_simple_similarity(self):
         """
         Performs a simple similarity test for each model.
@@ -72,7 +74,7 @@ class TestRunner:
             
             collection.release()
 
-        print("\nResults saved to tests/similarity_results.csv")
+        print("\nResults saved to tests/simple_similarity_results.csv")
         time.sleep(3)
 
     def run_complex_similarity(self):
@@ -103,15 +105,15 @@ class TestRunner:
                     anns_field="embedding",
                     param={"nprobe": 10},
                     limit=5,
-                    output_fields=["id"]
+                    output_fields=["id", "chunk"]
                 )
 
                 print(f"\nQuery ID: {q['id']} (Model: {model_name})")
                 for i, hit in enumerate(results[0]):
-                    print(f"  {i+1}. Match: {hit.id} | Score: {hit.distance:.4f}")
+                    print(f"  {i+1}. Match: {hit.id} | Chunk: {hit.chunk} | Score: {hit.distance:.4f}")
                 
                 results_df = pd.DataFrame(results)
-                self.csv_print(model_name, results_df, "complex_similarity_results")
+                self.csv_print(model_name, results_df, "complex_similarity_results", "Query ID:" + q['id'])
             
             queries_collection.release()
             docs_collection.release()

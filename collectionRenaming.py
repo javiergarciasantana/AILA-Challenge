@@ -16,7 +16,7 @@ from pymilvus import MilvusClient, utility, connections
 connections.connect("default", host="localhost", port="19530")
 print("Succesfully connected to milvus container!")
 
-collection_name = "test_queries"
+collection_name = "test_queries_multi_qa_mpnet_base_dot_v1"
 
 # 3. Drop (delete) the collection
 if utility.has_collection(collection_name):

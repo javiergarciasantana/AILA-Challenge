@@ -1,17 +1,48 @@
-===all_mpnet_base_v2===
+===Query ID:AILA_Q2(all_mpnet_base_v2)===
 "{'id': 'C2846', 'distance': 0.8789615631103516, 'entity': {'id': 'C2846'}}","{'id': 'C2313', 'distance': 0.8736978769302368, 'entity': {'id': 'C2313'}}","{'id': 'C1827', 'distance': 0.8712249398231506, 'entity': {'id': 'C1827'}}","{'id': 'C2644', 'distance': 0.8706236481666565, 'entity': {'id': 'C2644'}}","{'id': 'C2424', 'distance': 0.8673949241638184, 'entity': {'id': 'C2424'}}"
-
-===all_mpnet_base_v2===
+===Query ID:AILA_Q22(all_mpnet_base_v2)===
 "{'id': 'C2326', 'distance': 0.8878858089447021, 'entity': {'id': 'C2326'}}","{'id': 'C255', 'distance': 0.8808324337005615, 'entity': {'id': 'C255'}}","{'id': 'C1609', 'distance': 0.8791001439094543, 'entity': {'id': 'C1609'}}","{'id': 'C62', 'distance': 0.8790851831436157, 'entity': {'id': 'C62'}}","{'id': 'C2545', 'distance': 0.8780374526977539, 'entity': {'id': 'C2545'}}"
-
-===all_mpnet_base_v2===
+===Query ID:AILA_Q5(all_mpnet_base_v2)===
 "{'id': 'C1538', 'distance': 0.8677605390548706, 'entity': {'id': 'C1538'}}","{'id': 'C1043', 'distance': 0.8639050722122192, 'entity': {'id': 'C1043'}}","{'id': 'C1496', 'distance': 0.8620044589042664, 'entity': {'id': 'C1496'}}","{'id': 'C2635', 'distance': 0.860916256904602, 'entity': {'id': 'C2635'}}","{'id': 'C456', 'distance': 0.8563652634620667, 'entity': {'id': 'C456'}}"
-
-===all_MiniLM_L6_v2===
+===Query ID:AILA_Q2(all_MiniLM_L6_v2)===
 "{'id': 'C130', 'distance': 0.7362073659896851, 'entity': {'id': 'C130'}}","{'id': 'C1827', 'distance': 0.7329744100570679, 'entity': {'id': 'C1827'}}","{'id': 'C1986', 'distance': 0.7178599238395691, 'entity': {'id': 'C1986'}}","{'id': 'C2318', 'distance': 0.7176873683929443, 'entity': {'id': 'C2318'}}","{'id': 'C1919', 'distance': 0.7145372629165649, 'entity': {'id': 'C1919'}}"
-
-===all_MiniLM_L6_v2===
+===Query ID:AILA_Q22(all_MiniLM_L6_v2)===
 "{'id': 'C744', 'distance': 0.7714685797691345, 'entity': {'id': 'C744'}}","{'id': 'C2851', 'distance': 0.762374997138977, 'entity': {'id': 'C2851'}}","{'id': 'C2844', 'distance': 0.7601699233055115, 'entity': {'id': 'C2844'}}","{'id': 'C1290', 'distance': 0.756249189376831, 'entity': {'id': 'C1290'}}","{'id': 'C1636', 'distance': 0.7534117698669434, 'entity': {'id': 'C1636'}}"
-
-===all_MiniLM_L6_v2===
+===Query ID:AILA_Q5(all_MiniLM_L6_v2)===
 "{'id': 'C706', 'distance': 0.6759803295135498, 'entity': {'id': 'C706'}}","{'id': 'C1043', 'distance': 0.6753008365631104, 'entity': {'id': 'C1043'}}","{'id': 'C2549', 'distance': 0.669268786907196, 'entity': {'id': 'C2549'}}","{'id': 'C249', 'distance': 0.6679512858390808, 'entity': {'id': 'C249'}}","{'id': 'C1849', 'distance': 0.6646054983139038, 'entity': {'id': 'C1849'}}"
+===Query ID:AILA_Q2(multi_qa_mpnet_base_dot_v1)===
+"{'id': 'C130', 'distance': 35.15922546386719, 'entity': {'id': 'C130'}}","{'id': 'C1623', 'distance': 34.47004699707031, 'entity': {'id': 'C1623'}}","{'id': 'C2424', 'distance': 34.39199447631836, 'entity': {'id': 'C2424'}}","{'id': 'C2313', 'distance': 34.21961212158203, 'entity': {'id': 'C2313'}}","{'id': 'C2318', 'distance': 33.729164123535156, 'entity': {'id': 'C2318'}}"
+===Query ID:AILA_Q22(multi_qa_mpnet_base_dot_v1)===
+"{'id': 'C1817', 'distance': 33.48248291015625, 'entity': {'id': 'C1817'}}","{'id': 'C2505', 'distance': 33.33753967285156, 'entity': {'id': 'C2505'}}","{'id': 'C2354', 'distance': 33.20005798339844, 'entity': {'id': 'C2354'}}","{'id': 'C2795', 'distance': 33.102901458740234, 'entity': {'id': 'C2795'}}","{'id': 'C538', 'distance': 32.94614028930664, 'entity': {'id': 'C538'}}"
+===Query ID:AILA_Q5(multi_qa_mpnet_base_dot_v1)===
+"{'id': 'C1043', 'distance': 34.89582824707031, 'entity': {'id': 'C1043'}}","{'id': 'C1438', 'distance': 34.79914093017578, 'entity': {'id': 'C1438'}}","{'id': 'C2896', 'distance': 34.083892822265625, 'entity': {'id': 'C2896'}}","{'id': 'C315', 'distance': 34.0289306640625, 'entity': {'id': 'C315'}}","{'id': 'C1188', 'distance': 33.87294006347656, 'entity': {'id': 'C1188'}}"
+===Query ID:AILA_Q2(all_distilroberta_v1)===
+"{'id': 'C764', 'distance': 0.8692284822463989, 'entity': {'id': 'C764'}}","{'id': 'C2846', 'distance': 0.868916392326355, 'entity': {'id': 'C2846'}}","{'id': 'C823', 'distance': 0.8673505783081055, 'entity': {'id': 'C823'}}","{'id': 'C653', 'distance': 0.8660407066345215, 'entity': {'id': 'C653'}}","{'id': 'C1848', 'distance': 0.8639618158340454, 'entity': {'id': 'C1848'}}"
+===Query ID:AILA_Q22(all_distilroberta_v1)===
+"{'id': 'C2270', 'distance': 0.8625293970108032, 'entity': {'id': 'C2270'}}","{'id': 'C2479', 'distance': 0.8624053597450256, 'entity': {'id': 'C2479'}}","{'id': 'C632', 'distance': 0.8616504669189453, 'entity': {'id': 'C632'}}","{'id': 'C1417', 'distance': 0.8605170845985413, 'entity': {'id': 'C1417'}}","{'id': 'C354', 'distance': 0.8571746349334717, 'entity': {'id': 'C354'}}"
+===Query ID:AILA_Q5(all_distilroberta_v1)===
+"{'id': 'C915', 'distance': 0.8538122773170471, 'entity': {'id': 'C915'}}","{'id': 'C1417', 'distance': 0.8531956076622009, 'entity': {'id': 'C1417'}}","{'id': 'C1189', 'distance': 0.8465995192527771, 'entity': {'id': 'C1189'}}","{'id': 'C2222', 'distance': 0.8446317911148071, 'entity': {'id': 'C2222'}}","{'id': 'C1415', 'distance': 0.8435864448547363, 'entity': {'id': 'C1415'}}"
+===Query ID:AILA_Q2(all_mpnet_base_v2)===
+"{'id': 'C2846', 'distance': 0.8789615631103516, 'entity': {'id': 'C2846', 'chunk': 'chunk9'}}","{'id': 'C2313', 'distance': 0.8736978769302368, 'entity': {'id': 'C2313', 'chunk': 'chunk12'}}","{'id': 'C1827', 'distance': 0.8712249398231506, 'entity': {'id': 'C1827', 'chunk': 'chunk13'}}","{'id': 'C2644', 'distance': 0.8706236481666565, 'entity': {'id': 'C2644', 'chunk': 'chunk15'}}","{'id': 'C2424', 'distance': 0.8673949241638184, 'entity': {'id': 'C2424', 'chunk': 'chunk2'}}"
+===Query ID:AILA_Q22(all_mpnet_base_v2)===
+"{'id': 'C2326', 'distance': 0.8878858089447021, 'entity': {'id': 'C2326', 'chunk': 'chunk2'}}","{'id': 'C255', 'distance': 0.8808324337005615, 'entity': {'id': 'C255', 'chunk': 'chunk2'}}","{'id': 'C1609', 'distance': 0.8791001439094543, 'entity': {'id': 'C1609', 'chunk': 'chunk2'}}","{'id': 'C62', 'distance': 0.8790851831436157, 'entity': {'id': 'C62', 'chunk': 'chunk16'}}","{'id': 'C2545', 'distance': 0.8780374526977539, 'entity': {'id': 'C2545', 'chunk': 'chunk2'}}"
+===Query ID:AILA_Q5(all_mpnet_base_v2)===
+"{'id': 'C1538', 'distance': 0.8677605390548706, 'entity': {'id': 'C1538', 'chunk': 'chunk22'}}","{'id': 'C1043', 'distance': 0.8639050722122192, 'entity': {'id': 'C1043', 'chunk': 'chunk2'}}","{'id': 'C1496', 'distance': 0.8620044589042664, 'entity': {'id': 'C1496', 'chunk': 'chunk31'}}","{'id': 'C2635', 'distance': 0.860916256904602, 'entity': {'id': 'C2635', 'chunk': 'chunk7'}}","{'id': 'C456', 'distance': 0.8563652634620667, 'entity': {'id': 'C456', 'chunk': 'chunk5'}}"
+===Query ID:AILA_Q2(all_MiniLM_L6_v2)===
+"{'id': 'C130', 'distance': 0.7362073659896851, 'entity': {'id': 'C130', 'chunk': 'chunk2'}}","{'id': 'C1827', 'distance': 0.7329744100570679, 'entity': {'id': 'C1827', 'chunk': 'chunk13'}}","{'id': 'C1986', 'distance': 0.7178599238395691, 'entity': {'id': 'C1986', 'chunk': 'chunk1'}}","{'id': 'C2318', 'distance': 0.7176873683929443, 'entity': {'id': 'C2318', 'chunk': 'chunk11'}}","{'id': 'C1919', 'distance': 0.7145372629165649, 'entity': {'id': 'C1919', 'chunk': 'chunk4'}}"
+===Query ID:AILA_Q22(all_MiniLM_L6_v2)===
+"{'id': 'C744', 'distance': 0.7714685797691345, 'entity': {'id': 'C744', 'chunk': 'chunk10'}}","{'id': 'C2851', 'distance': 0.762374997138977, 'entity': {'id': 'C2851', 'chunk': 'chunk9'}}","{'id': 'C2844', 'distance': 0.7601699233055115, 'entity': {'id': 'C2844', 'chunk': 'chunk8'}}","{'id': 'C1290', 'distance': 0.756249189376831, 'entity': {'id': 'C1290', 'chunk': 'chunk3'}}","{'id': 'C1636', 'distance': 0.7534117698669434, 'entity': {'id': 'C1636', 'chunk': 'chunk20'}}"
+===Query ID:AILA_Q5(all_MiniLM_L6_v2)===
+"{'id': 'C706', 'distance': 0.6759803295135498, 'entity': {'chunk': 'chunk9', 'id': 'C706'}}","{'id': 'C1043', 'distance': 0.6753008365631104, 'entity': {'chunk': 'chunk11', 'id': 'C1043'}}","{'id': 'C2549', 'distance': 0.669268786907196, 'entity': {'chunk': 'chunk6', 'id': 'C2549'}}","{'id': 'C249', 'distance': 0.6679512858390808, 'entity': {'chunk': 'chunk10', 'id': 'C249'}}","{'id': 'C1849', 'distance': 0.6646054983139038, 'entity': {'chunk': 'chunk7', 'id': 'C1849'}}"
+===Query ID:AILA_Q2(multi_qa_mpnet_base_dot_v1)===
+"{'id': 'C130', 'distance': 35.15922546386719, 'entity': {'id': 'C130', 'chunk': 'chunk2'}}","{'id': 'C1623', 'distance': 34.47004699707031, 'entity': {'id': 'C1623', 'chunk': 'chunk11'}}","{'id': 'C2424', 'distance': 34.39199447631836, 'entity': {'id': 'C2424', 'chunk': 'chunk2'}}","{'id': 'C2313', 'distance': 34.21961212158203, 'entity': {'id': 'C2313', 'chunk': 'chunk12'}}","{'id': 'C2318', 'distance': 33.729164123535156, 'entity': {'id': 'C2318', 'chunk': 'chunk23'}}"
+===Query ID:AILA_Q22(multi_qa_mpnet_base_dot_v1)===
+"{'id': 'C1817', 'distance': 33.48248291015625, 'entity': {'id': 'C1817', 'chunk': 'chunk4'}}","{'id': 'C2505', 'distance': 33.33753967285156, 'entity': {'id': 'C2505', 'chunk': 'chunk5'}}","{'id': 'C2354', 'distance': 33.20005798339844, 'entity': {'id': 'C2354', 'chunk': 'chunk5'}}","{'id': 'C2795', 'distance': 33.102901458740234, 'entity': {'id': 'C2795', 'chunk': 'chunk21'}}","{'id': 'C538', 'distance': 32.94614028930664, 'entity': {'id': 'C538', 'chunk': 'chunk4'}}"
+===Query ID:AILA_Q5(multi_qa_mpnet_base_dot_v1)===
+"{'id': 'C1043', 'distance': 34.89582824707031, 'entity': {'id': 'C1043', 'chunk': 'chunk2'}}","{'id': 'C1438', 'distance': 34.79914093017578, 'entity': {'id': 'C1438', 'chunk': 'chunk9'}}","{'id': 'C2896', 'distance': 34.083892822265625, 'entity': {'id': 'C2896', 'chunk': 'chunk1'}}","{'id': 'C315', 'distance': 34.0289306640625, 'entity': {'id': 'C315', 'chunk': 'chunk4'}}","{'id': 'C1188', 'distance': 33.87294006347656, 'entity': {'id': 'C1188', 'chunk': 'chunk1'}}"
+===Query ID:AILA_Q2(all_distilroberta_v1)===
+"{'id': 'C764', 'distance': 0.8692284822463989, 'entity': {'id': 'C764', 'chunk': 'chunk3'}}","{'id': 'C2846', 'distance': 0.868916392326355, 'entity': {'id': 'C2846', 'chunk': 'chunk9'}}","{'id': 'C823', 'distance': 0.8673505783081055, 'entity': {'id': 'C823', 'chunk': 'chunk3'}}","{'id': 'C653', 'distance': 0.8660407066345215, 'entity': {'id': 'C653', 'chunk': 'chunk4'}}","{'id': 'C1848', 'distance': 0.8639618158340454, 'entity': {'id': 'C1848', 'chunk': 'chunk4'}}"
+===Query ID:AILA_Q22(all_distilroberta_v1)===
+"{'id': 'C2270', 'distance': 0.8625293970108032, 'entity': {'chunk': 'chunk2', 'id': 'C2270'}}","{'id': 'C2479', 'distance': 0.8624053597450256, 'entity': {'chunk': 'chunk2', 'id': 'C2479'}}","{'id': 'C632', 'distance': 0.8616504669189453, 'entity': {'chunk': 'chunk2', 'id': 'C632'}}","{'id': 'C1417', 'distance': 0.8605170845985413, 'entity': {'chunk': 'chunk18', 'id': 'C1417'}}","{'id': 'C354', 'distance': 0.8571746349334717, 'entity': {'chunk': 'chunk4', 'id': 'C354'}}"
+===Query ID:AILA_Q5(all_distilroberta_v1)===
+"{'id': 'C915', 'distance': 0.8538122773170471, 'entity': {'id': 'C915', 'chunk': 'chunk4'}}","{'id': 'C1417', 'distance': 0.8531956076622009, 'entity': {'id': 'C1417', 'chunk': 'chunk18'}}","{'id': 'C1189', 'distance': 0.8465995192527771, 'entity': {'id': 'C1189', 'chunk': 'chunk11'}}","{'id': 'C2222', 'distance': 0.8446317911148071, 'entity': {'id': 'C2222', 'chunk': 'chunk5'}}","{'id': 'C1415', 'distance': 0.8435864448547363, 'entity': {'id': 'C1415', 'chunk': 'chunk7'}}"

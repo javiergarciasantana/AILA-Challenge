@@ -187,7 +187,7 @@ def load_embeddings(model):
 # ===========================
 # Collection helper Functions
 # ===========================
-def ensure_index(collection_name):
+def ensure_index(collection_name, index_type):
     collection = Collection(collection_name)
 
     # Only create index if not already present
@@ -198,7 +198,7 @@ def ensure_index(collection_name):
 
         index_params = {
             "metric_type": "IP",        # inner product similarity
-            "index_type": "IVF_FLAT",   # clustered flat index
+            "index_type": index_type,   # clustered flat index or simple flat
             "params": {"nlist": nlist}
         }
 
