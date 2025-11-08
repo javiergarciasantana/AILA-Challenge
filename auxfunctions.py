@@ -56,10 +56,10 @@ def process_judgment_to_dict(line, result_dict):
 
 def load_objects(type, folder_path):
   docs = {}  
-  if type == "casedocs":
+  if type == "casedoc":
     range_objects = range(1, 2915)
     obj_name = "C"  
-  elif type == "statutes":
+  elif type == "statute":
     range_objects = range(1, 201)
     obj_name = "S" 
 
@@ -104,8 +104,8 @@ def all_underscores(model_name):
 # Embedding Saving and Loading
 # ==========================
 
-def save_embeddings_cs(embeddings, chunked_docs, model):
-  dir_path = "export/" + model
+def save_embeddings_cs(embeddings, chunked_docs, option, model):
+  dir_path = "export/" + model + "/" + option
 
   try:
       os.makedirs(dir_path, exist_ok=True)
@@ -164,14 +164,15 @@ def save_embeddings_q(embeddings, texts, ids, model):
     return False  # indicate failure
 
   
-def load_embeddings(model):
-  dir_path = "export/" + model
+def load_embeddings(model, kind=''):
+  dir_path = "export/" + model + "/" +kind
   try:
     # Load metadata
     meta_df = pd.read_csv(dir_path + "/metadata.tsv", sep="\t")
 
     # Load embeddings
     embeddings = np.loadtxt(dir_path + "/embeddings.tsv", delimiter="\t")
+
 
   except Exception as e:
       print(f"❌ Error while loading embeddings or metadata: {e}")
@@ -218,3 +219,20 @@ def visualize_collections():
      print(f"  {i}. {collection}")
   print("\n✨ Total collections:", len(collections))
   time.sleep(5)
+
+def average_chars_in_textfiles(dir_path):
+  total_chars = 0
+  file_count = 0
+
+  for file_name in os.listdir(dir_path):
+    file_path = os.path.join(dir_path, file_name)
+    if os.path.isfile(file_path) and file_name.endswith(".txt"):
+      with open(file_path, 'r', encoding='utf-8') as file:
+        total_chars += len(file.read())
+        file_count += 1
+
+  if file_count == 0:
+    print("No text files found in the directory.")
+    return 0
+
+  return total_chars / file_count

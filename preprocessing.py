@@ -26,23 +26,39 @@ from auxfunctions import load_objects,load_queries, visualize_docs, save_embeddi
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
-def cs_proc():            
+def cs_proc(option, path):            
   # --- 1. Load Data ---
-  cases = load_objects("casedocs", "./archive/Object_casedocs")  
-  statutes = load_objects("statutes", "./archive/Object_statutes")
+  # cases = load_objects("casedoc", "./archive/Object_casedocs")  
+  # statutes = load_objects("statute", "./archive/Object_statutes")
+
+  input = load_objects(option, path)
 
   # --- 2. Prepare Documents for Chunking ---
   docs = []
-  for case_id, case_text in cases.items():
-      docs.append({"text": case_text, "type": "casedoc", "id": case_id})
-
-  for statute_id, statute_text in statutes.items():
-      docs.append({"text": statute_text, "type": "statute", "id": statute_id})
+  for case_id, case_text in input.items():
+      docs.append({"text": case_text, "type": option, "id": case_id})
 
   # visualize_docs(docs) #Debug
 
   # --- 3. Chunk the Documents ---
-  text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+  # chunk_size = 1000
+  # chunked_docs = []
+  # for doc in docs:
+  #     text = doc["text"]
+  #     chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+  #     for i, chunk in enumerate(chunks):
+  #         chunked_docs.append({
+  #             "text": chunk,
+  #             "type": doc["type"],
+  #             "id": doc["id"],
+  #             "chunk": f"chunk{i}" 
+  #         })
+
+  text_splitter = RecursiveCharacterTextSplitter(
+      chunk_size=1000,
+      chunk_overlap=100,  # Add overlap to maintain context between chunks
+      length_function=len,
+  )
   chunked_docs = []
   for doc in docs:
       chunks = text_splitter.split_text(doc["text"])
@@ -54,13 +70,14 @@ def cs_proc():
               "chunk": f"chunk{i}" 
           })
 
+
   #visualize_docs(chunks)
   print(f"Loaded {len(docs)} documents and split into {len(chunked_docs)} chunks.")
 
   # --- 4. Generate Embeddings ---
 
   #Let the user choose the embedding model to use
-  title = 'Please choose your preferred embedding model: '
+  title = f'Please choose your preferred {option} embedding model: '
   options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'back']
   
 
@@ -70,7 +87,7 @@ def cs_proc():
      return
 
   # Load a free embedding model (runs locally)
-  print("Running " + selected_model + " embedding model...\n")
+  print(f"Running {selected_model} embedding model for {option}...\n")
   model = SentenceTransformer(selected_model)
 
   def embed_text(texts):
@@ -83,7 +100,7 @@ def cs_proc():
   embeddings = embed_text(texts)
 
   print("Saving the" + selected_model + "embeddings into .tsv files...\n")
-  save_embeddings_cs(embeddings, chunked_docs, all_underscores(selected_model))
+  save_embeddings_cs(embeddings, chunked_docs, option, all_underscores(selected_model))
 
 
 def q_proc():
@@ -123,7 +140,8 @@ def main():
     if selected_option == options[2]:
       sys.exit()
     elif selected_option == options[0]:
-      cs_proc()
+      cs_proc("casedoc", "./archive/Object_casedocs")
+      cs_proc("statute", "./archive/Object_statutes")
     else:
       q_proc()
      

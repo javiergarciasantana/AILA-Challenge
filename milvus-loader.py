@@ -1,5 +1,5 @@
 from pymilvus import connections
-from auxfunctions import load_embeddings, visualize_collections
+from auxfunctions import load_embeddings, visualize_collections, average_chars_in_textfiles
 import sys
 import time
 from menu import Menu
@@ -7,9 +7,9 @@ from testRunner import TestRunner
 from dataManager import CaseStatuteStorer, QueryStorer
 
 
-def load_case_docs_and_statutes(models):
+def load_case_docs_and_statutes(models, kind):
     """Handler to load casedoc and statute embeddings for a chosen model."""
-    print("\nSelect a model to load embeddings from:")
+    print(f"\nSelect a model to load {kind} embeddings from:")
     for i, model in enumerate(models):
         print(f"  {i+1}. {model}")
     
@@ -19,9 +19,9 @@ def load_case_docs_and_statutes(models):
             selected_model = models[choice]
             print(f"Processing model: {selected_model}...")
             
-            meta_df, embeddings = load_embeddings(selected_model)
+            meta_df, embeddings = load_embeddings(selected_model, kind)
             if meta_df is not None:
-                storer = CaseStatuteStorer(selected_model)
+                storer = CaseStatuteStorer(selected_model, kind)
                 storer.store(meta_df, embeddings)
         else:
             print("Invalid choice.")
@@ -77,10 +77,13 @@ def main():
   main_menu = Menu(
       title='Please choose what you wish to do:',
       options=[
-          ('Load Casedoc & Statutes', lambda: load_case_docs_and_statutes(models)),
+          ('Load Casedoc & Statutes', lambda: (load_case_docs_and_statutes(models, "casedoc"), 
+                                               load_case_docs_and_statutes(models, "statute"))),
           ('Load Test Queries', lambda: load_test_queries(models)),
           ('Run Tests', test_menu.show),
           ('Visualize Collections', visualize_collections),
+          ('Average chars in casedocs & statutes', lambda:(average_chars_in_textfiles("./archive/Object_casedocs"),
+                                                           average_chars_in_textfiles("./archive/statutes"))),
           ('Exit', sys.exit)
       ]
   )

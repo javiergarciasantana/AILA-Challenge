@@ -85,37 +85,62 @@ class TestRunner:
         """
         print("Running Complex Similarity Test...")
         for model_name in self.models:
-            queries_col_name = f"test_queries_{model_name}"
-            docs_col_name = f"legal_docs_{model_name}"
 
-            if not utility.has_collection(queries_col_name) or not utility.has_collection(docs_col_name):
-                print(f"Required collections for model '{model_name}' not found. Skipping.")
-                continue
+          queries_col_name = f"test_queries_{model_name}"
+          satute_docs_col_name = f"statute_{model_name}"
+          casedoc_docs_col_name = f"casedoc_{model_name}"
 
-            queries_collection = Collection(queries_col_name)
-            queries_collection.load()
+          if (
+              not utility.has_collection(queries_col_name) or 
+              not utility.has_collection(satute_docs_col_name) or 
+              not utility.has_collection(casedoc_docs_col_name)
+          ):
+              print(f"Required collections for model '{model_name}' not found. Skipping.")
+              continue
 
-            docs_collection = Collection(docs_col_name)
-            docs_collection.load()
+          queries_collection = Collection(queries_col_name)
+          queries_collection.load()
 
-            query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
-            for q in query_results:
-                results = docs_collection.search(
-                    data=[q["embedding"]],
-                    anns_field="embedding",
-                    param={"nprobe": 10},
-                    limit=5,
-                    output_fields=["id", "chunk"]
-                )
+          statute_collection = Collection(satute_docs_col_name)
+          statute_collection.load()
 
-                print(f"\nQuery ID: {q['id']} (Model: {model_name})")
-                for i, hit in enumerate(results[0]):
-                    print(f"  {i+1}. Match: {hit.id} | Chunk: {hit.chunk} | Score: {hit.distance:.4f}")
-                
-                results_df = pd.DataFrame(results)
-                self.csv_print(model_name, results_df, "complex_similarity_results", "Query ID:" + q['id'])
-            
-            queries_collection.release()
-            docs_collection.release()
-        
+          casedoc_collection = Collection(casedoc_docs_col_name)
+          casedoc_collection.load()
+
+          query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
+          for q in query_results:
+              results_s = statute_collection.search(
+                  data=[q["embedding"]],
+                  anns_field="embedding",
+                  param={"nprobe": 10},
+                  limit=20,
+                  output_fields=["id", "chunk"]
+              )
+
+              results_c = casedoc_collection.search(
+                  data=[q["embedding"]],
+                  anns_field="embedding",
+                  param={"nprobe": 10},
+                  limit=20,
+                  output_fields=["id", "chunk"]
+              )
+
+              print(f"\nQuery ID: {q['id']} (Model: {model_name})")
+              for i, hit in enumerate(results_s[0]):
+                  print(f"  {i+1}. Match: {hit.id} | Chunk: {hit.chunk} | Score: {hit.distance:.4f}")
+              
+              results_df = pd.DataFrame(results_s)
+              self.csv_print(model_name, results_df, "complex_similarity_results", "Query ID:" + q['id'])
+
+              print(f"\nQuery ID: {q['id']} (Model: {model_name})")
+              for i, hit in enumerate(results_c[0]):
+                  print(f"  {i+1}. Match: {hit.id} | Chunk: {hit.chunk} | Score: {hit.distance:.4f}")
+              
+              results_df = pd.DataFrame(results_c)
+              self.csv_print(model_name, results_df, "complex_similarity_results", "Query ID:" + q['id'])
+          
+          queries_collection.release()
+          statute_collection.release()
+          casedoc_collection.release()
+      
         time.sleep(3)

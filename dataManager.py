@@ -5,14 +5,15 @@ import time
 class CaseStatuteStorer:
     """Manages storage of casedoc and statute embeddings in Milvus."""
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, kind):
         """
         Initializes the storer for a specific embedding model.
         Args:
             model_name (str): The name of the model.
         """
         self.model_name = model_name
-        self.collection_name = f"legal_docs_{self.model_name}"
+        self.kind = kind
+        self.collection_name = f"{self.kind}_{self.model_name}"
 
     def store(self, meta_df, embeddings):
         """Creates a collection and inserts casedoc/statute data."""
@@ -28,7 +29,7 @@ class CaseStatuteStorer:
             FieldSchema(name="type", dtype=DataType.VARCHAR, max_length=20),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim)
         ]
-        schema = CollectionSchema(fields, description="Casedoc and statute embeddings")
+        schema = CollectionSchema(fields, description=f"{self.kind} embeddings")
         collection = Collection(self.collection_name, schema)
 
         print("Inserting data in batches...")
