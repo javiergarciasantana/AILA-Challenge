@@ -25,13 +25,19 @@ from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Colle
 from auxfunctions import load_objects,load_queries, visualize_docs, save_embeddings_cs, save_embeddings_q, all_underscores
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from menu import Menu
 
 def cs_proc(option, path):            
   # --- 1. Load Data ---
-  # cases = load_objects("casedoc", "./archive/Object_casedocs")  
-  # statutes = load_objects("statute", "./archive/Object_statutes")
-
   input = load_objects(option, path)
+
+  #Let the user choose the embedding model to use
+  title = f'Please choose your preferred {option} embedding model: '
+  options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'back']
+  
+  selected_model, model_num = pick(options, title, indicator='=>', default_index=1)
+
+  if selected_model == 'back': return
 
   # --- 2. Prepare Documents for Chunking ---
   docs = []
@@ -41,22 +47,12 @@ def cs_proc(option, path):
   # visualize_docs(docs) #Debug
 
   # --- 3. Chunk the Documents ---
-  # chunk_size = 1000
-  # chunked_docs = []
-  # for doc in docs:
-  #     text = doc["text"]
-  #     chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
-  #     for i, chunk in enumerate(chunks):
-  #         chunked_docs.append({
-  #             "text": chunk,
-  #             "type": doc["type"],
-  #             "id": doc["id"],
-  #             "chunk": f"chunk{i}" 
-  #         })
-
+  chunk_sizes = [1500, 1000, 2200, 2200]
+  chunk_overlaps = [250, 200, 300, 300]
+  print(chunk_sizes[model_num])
   text_splitter = RecursiveCharacterTextSplitter(
-      chunk_size=1000,
-      chunk_overlap=100,  # Add overlap to maintain context between chunks
+      chunk_size=chunk_sizes[model_num],
+      chunk_overlap=chunk_overlaps[model_num],  # Add overlap to maintain context between chunks
       length_function=len,
   )
   chunked_docs = []
@@ -75,16 +71,6 @@ def cs_proc(option, path):
   print(f"Loaded {len(docs)} documents and split into {len(chunked_docs)} chunks.")
 
   # --- 4. Generate Embeddings ---
-
-  #Let the user choose the embedding model to use
-  title = f'Please choose your preferred {option} embedding model: '
-  options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'back']
-  
-
-  selected_model = pick(options, title, indicator='=>', default_index=1)[0]
-
-  if selected_model == 'back':
-     return
 
   # Load a free embedding model (runs locally)
   print(f"Running {selected_model} embedding model for {option}...\n")
@@ -131,20 +117,21 @@ def q_proc():
     save_embeddings_q(embeddings, texts,ids, all_underscores(model_name))
 
 
-def main():
-  while(True):
-    title = 'Please choose what you wish to create the embeddings of: '
-    options = ['Casedoc & Statutes', '3 Test queries for all models', 'Exit']
+def preprocessing_menu():
+    """Displays a menu to let the user choose which data to preprocess."""
+    title = 'Please choose which data to preprocess:'
+    options = [
+        ('Case Documents', lambda: cs_proc("casedoc", "./archive/Object_casedocs")),
+        ('Statutes', lambda: cs_proc("statute", "./archive/Object_statutes")),
+        ('3 Test Queries for all models', q_proc),
+        ('Back', None)
+    ]
+    
+    # Use the Menu class to show the options
+    menu = Menu(title, options)
+    menu.show()
 
-    selected_option = pick(options, title, indicator='=>', default_index=1)[0]
-    if selected_option == options[2]:
-      sys.exit()
-    elif selected_option == options[0]:
-      cs_proc("casedoc", "./archive/Object_casedocs")
-      cs_proc("statute", "./archive/Object_statutes")
-    else:
-      q_proc()
-     
-
-if __name__ == "__main__" :
-  main()
+# This main block is useful for testing preprocessing.py directly,
+# but it should not run when imported by another script.
+if __name__ == "__main__":
+    preprocessing_menu()

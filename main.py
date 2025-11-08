@@ -5,6 +5,7 @@ import time
 from menu import Menu
 from testRunner import TestRunner
 from dataManager import CaseStatuteStorer, QueryStorer
+from preprocessing import preprocessing_menu
 
 
 def load_case_docs_and_statutes(models, kind):
@@ -77,13 +78,14 @@ def main():
   main_menu = Menu(
       title='Please choose what you wish to do:',
       options=[
+          ('Preprocessing of data', preprocessing_menu),
           ('Load Casedoc & Statutes', lambda: (load_case_docs_and_statutes(models, "casedoc"), 
                                                load_case_docs_and_statutes(models, "statute"))),
           ('Load Test Queries', lambda: load_test_queries(models)),
           ('Run Tests', test_menu.show),
           ('Visualize Collections', visualize_collections),
           ('Average chars in casedocs & statutes', lambda:(average_chars_in_textfiles("./archive/Object_casedocs"),
-                                                           average_chars_in_textfiles("./archive/statutes"))),
+                                                           average_chars_in_textfiles("./archive/Object_statutes"))),
           ('Exit', sys.exit)
       ]
   )

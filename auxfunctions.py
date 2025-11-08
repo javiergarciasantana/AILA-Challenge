@@ -69,7 +69,9 @@ def load_objects(type, folder_path):
       
       if os.path.exists(file_path):  # Check if file exists
           case_name = os.path.splitext(file_name)[0]  # Get filename without extension
-          docs[case_name] = read_file(file_path)  # Read file and store in dictionary
+          original_text = read_file(file_path)  # Read file
+          clean_text = " ".join(original_text.split())  # Clean text
+          docs[case_name] = clean_text  # Store cleaned text in dictionary
   return docs  
 
 
@@ -228,11 +230,14 @@ def average_chars_in_textfiles(dir_path):
     file_path = os.path.join(dir_path, file_name)
     if os.path.isfile(file_path) and file_name.endswith(".txt"):
       with open(file_path, 'r', encoding='utf-8') as file:
-        total_chars += len(file.read())
+        content = file.read()
+        # Remove all whitespace (spaces, tabs, newlines) before counting
+        content_no_whitespace = "".join(content.split())
+        total_chars += len(content_no_whitespace)
         file_count += 1
 
   if file_count == 0:
     print("No text files found in the directory.")
     return 0
 
-  return total_chars / file_count
+  print("Char number avg in " + dir_path + ": " + str(total_chars / file_count))
