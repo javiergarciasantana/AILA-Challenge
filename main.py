@@ -1,4 +1,4 @@
-from pymilvus import connections
+from pymilvus import connections, MilvusException
 from auxfunctions import load_embeddings, visualize_collections, average_chars_in_textfiles
 import sys
 import time
@@ -57,7 +57,7 @@ def main():
   try:
     connections.connect("default", host="localhost", port="19530")
     print("✅ Successfully connected to Milvus container!")
-  except Exception as e:
+  except MilvusException as e:
     print(f"❌ Failed to connect to Milvus: {e}")
     sys.exit(1)
 

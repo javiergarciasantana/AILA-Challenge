@@ -45,6 +45,11 @@ def cs_proc(option, path):
       docs.append({"text": case_text, "type": option, "id": case_id})
 
   # visualize_docs(docs) #Debug
+  
+  # all-mpnet-base-v2: 57972 chunks Casedocs | 514 chunks statutes
+  # all-MiniLM-L6-v2: 88328 chunks Casedocs | 738 chunks statutes
+  # multi-qa-mpnet-base-dot-v1: 38364 chunks Casedocs | 387 chunks statutes
+  # all-distilroberta_v1: 38364 chunks Casedocs | 387 chunks statutes
 
   # --- 3. Chunk the Documents ---
   chunk_sizes = [1500, 1000, 2200, 2200]
@@ -130,8 +135,3 @@ def preprocessing_menu():
     # Use the Menu class to show the options
     menu = Menu(title, options)
     menu.show()
-
-# This main block is useful for testing preprocessing.py directly,
-# but it should not run when imported by another script.
-if __name__ == "__main__":
-    preprocessing_menu()

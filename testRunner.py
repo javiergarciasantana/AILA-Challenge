@@ -4,6 +4,9 @@ import pandas as pd
 import time
 import os
 import re
+from pathlib import Path
+from datetime import datetime
+
 
 class TestRunner:
     """A class to encapsulate Milvus similarity testing logic."""
@@ -26,16 +29,16 @@ class TestRunner:
       file_path = f"tests/{filename}.csv"
       
       try:
-        with open(file_path, 'a') as f:
+        with open(file_path, 'a', newline='', encoding='utf-8') as f:
           # Write model name as a header and append to CSV
-          f.write(f"==={query_id}({model})===\n")
-          results_df.to_csv(f, index=False, header=False)
+          f.write(f"=== {query_id} ({model}) ===\n")
+          results_df.to_csv(f, index=False, header=True)
       except FileNotFoundError:
         print(f"Directory for {file_path} not found. Creating it...")
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'a') as f:
-          f.write(f"==={model}===\n")
-          results_df.to_csv(f, index=False, header=False)
+        with open(file_path, 'a', newline='', encoding='utf-8') as f:
+          f.write(f"=== {query_id} ({model}) ===\n")
+          results_df.to_csv(f, index=False, header=True)
           
     def run_simple_similarity(self):
         """
@@ -45,12 +48,12 @@ class TestRunner:
         """
         print("Running Simple Similarity Test...")
         for model in self.models:
-            collection_name = f"legal_docs_{model}"
+            collection_name = f"casedoc_{model}"
             if not utility.has_collection(collection_name):
                 print(f"Collection {collection_name} not found. Skipping.")
                 continue
 
-            _, embeddings = load_embeddings(model)
+            _, embeddings = load_embeddings(model, "casedoc")
             collection = Collection(collection_name)
             collection.load()
 
@@ -84,8 +87,11 @@ class TestRunner:
         and searches for neighbors in the corresponding 'legal_docs' collection.
         """
         print("Running Complex Similarity Test...")
+        all_rows_statute = []
+        all_rows_casedoc = []
+        
         for model_name in self.models:
-
+          #model_name = "multi_qa_mpnet_base_dot_v1"
           queries_col_name = f"test_queries_{model_name}"
           satute_docs_col_name = f"statute_{model_name}"
           casedoc_docs_col_name = f"casedoc_{model_name}"
@@ -107,12 +113,20 @@ class TestRunner:
           casedoc_collection = Collection(casedoc_docs_col_name)
           casedoc_collection.load()
 
+          search_params = {
+            "metric_type": "L2",
+            "offset": 0,
+            "ignore_growing": False,
+            "params": {"nprobe": 10}
+          }
+
+
           query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
           for q in query_results:
               results_s = statute_collection.search(
                   data=[q["embedding"]],
                   anns_field="embedding",
-                  param={"nprobe": 10},
+                  param=search_params,
                   limit=20,
                   output_fields=["id", "chunk"]
               )
@@ -120,27 +134,58 @@ class TestRunner:
               results_c = casedoc_collection.search(
                   data=[q["embedding"]],
                   anns_field="embedding",
-                  param={"nprobe": 10},
+                  param=search_params,
                   limit=20,
                   output_fields=["id", "chunk"]
               )
+              rows_s = [
+                  {
+                      "query_id": q["id"],
+                      "model": model_name,
+                      "target": "statute",
+                      "rank": i + 1,
+                      "id": hit.id,
+                      "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
+                      "score": float(hit.distance),
+                  }
+                  for i, hit in enumerate(results_s[0])
+              ]
+              rows_c = [
+                  {
+                      "query_id": q["id"],
+                      "model": model_name,
+                      "target": "casedoc",
+                      "rank": i + 1,
+                      "id": hit.id,
+                      "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
+                      "score": float(hit.distance),
+                  }
+                  for i, hit in enumerate(results_c[0])
+              ]
+              all_rows_statute.extend(rows_s)
+              all_rows_casedoc.extend(rows_c)
 
-              print(f"\nQuery ID: {q['id']} (Model: {model_name})")
-              for i, hit in enumerate(results_s[0]):
-                  print(f"  {i+1}. Match: {hit.id} | Chunk: {hit.chunk} | Score: {hit.distance:.4f}")
-              
-              results_df = pd.DataFrame(results_s)
-              self.csv_print(model_name, results_df, "complex_similarity_results", "Query ID:" + q['id'])
+              # Optional console preview
+              print(f"\nQuery ID: {q['id']} (Model: {model_name}) - Statutes")
+              print(pd.DataFrame(rows_s)[["rank","id","chunk","score"]])
+              print(f"\nQuery ID: {q['id']} (Model: {model_name}) - CaseDocs")
+              print(pd.DataFrame(rows_c)[["rank","id","chunk","score"]])
 
-              print(f"\nQuery ID: {q['id']} (Model: {model_name})")
-              for i, hit in enumerate(results_c[0]):
-                  print(f"  {i+1}. Match: {hit.id} | Chunk: {hit.chunk} | Score: {hit.distance:.4f}")
-              
-              results_df = pd.DataFrame(results_c)
-              self.csv_print(model_name, results_df, "complex_similarity_results", "Query ID:" + q['id'])
-          
           queries_collection.release()
           statute_collection.release()
           casedoc_collection.release()
-      
-        time.sleep(3)
+
+        # Export to Excel with proper sheets
+        out_dir = Path("tests")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        xlsx_path = out_dir / f"complex_similarity_results_{ts}.xlsx"
+
+        # with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+        #     if all_rows_statute:
+        #         pd.DataFrame(all_rows_statute).to_excel(writer, sheet_name="Statutes", index=False)
+        #     if all_rows_casedoc:
+        #         pd.DataFrame(all_rows_casedoc).to_excel(writer, sheet_name="CaseDocs", index=False)
+
+        # print(f"\nExcel saved to {xlsx_path}")
+        time.sleep(1)
