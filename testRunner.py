@@ -1,5 +1,5 @@
 from pymilvus import Collection, utility
-from auxfunctions import load_embeddings
+from auxfunctions import load_embeddings, is_expected
 import pandas as pd
 import time
 import os
@@ -39,7 +39,21 @@ class TestRunner:
         with open(file_path, 'a', newline='', encoding='utf-8') as f:
           f.write(f"=== {query_id} ({model}) ===\n")
           results_df.to_csv(f, index=False, header=True)
-          
+    
+    def xlsx_print(self, all_rows_statute, all_rows_casedoc):
+      # Export to Excel with proper sheets
+      out_dir = Path("tests")
+      out_dir.mkdir(parents=True, exist_ok=True)
+      ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+      xlsx_path = out_dir / f"complex_similarity_results_{ts}.xlsx"
+
+      with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+          if all_rows_statute:
+              pd.DataFrame(all_rows_statute).to_excel(writer, sheet_name="Statutes", index=False)
+          if all_rows_casedoc:
+              pd.DataFrame(all_rows_casedoc).to_excel(writer, sheet_name="CaseDocs", index=False)
+       
+       
     def run_simple_similarity(self):
         """
         Performs a simple similarity test for each model.
@@ -89,7 +103,7 @@ class TestRunner:
         print("Running Complex Similarity Test...")
         all_rows_statute = []
         all_rows_casedoc = []
-        
+
         for model_name in self.models:
           #model_name = "multi_qa_mpnet_base_dot_v1"
           queries_col_name = f"test_queries_{model_name}"
@@ -119,10 +133,13 @@ class TestRunner:
             "ignore_growing": False,
             "params": {"nprobe": 10}
           }
-
+          
 
           query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
           for q in query_results:
+              casedoc_precision = 0
+              statute_precision = 0
+
               results_s = statute_collection.search(
                   data=[q["embedding"]],
                   anns_field="embedding",
@@ -138,8 +155,9 @@ class TestRunner:
                   limit=20,
                   output_fields=["id", "chunk"]
               )
-              rows_s = [
-                  {
+              rows_s = []
+              for i, hit in enumerate(results_s[0]):
+                  row = {
                       "query_id": q["id"],
                       "model": model_name,
                       "target": "statute",
@@ -148,10 +166,15 @@ class TestRunner:
                       "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
                       "score": float(hit.distance),
                   }
-                  for i, hit in enumerate(results_s[0])
-              ]
-              rows_c = [
-                  {
+                  rows_s.append(row)
+                  # Call function and increment counter if true
+                  if is_expected("statute", q["id"], hit.id):
+                      statute_precision += 1
+
+              # --- Process Casedoc Results with a for loop ---
+              rows_c = []
+              for i, hit in enumerate(results_c[0]):
+                  row = {
                       "query_id": q["id"],
                       "model": model_name,
                       "target": "casedoc",
@@ -160,32 +183,35 @@ class TestRunner:
                       "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
                       "score": float(hit.distance),
                   }
-                  for i, hit in enumerate(results_c[0])
-              ]
-              all_rows_statute.extend(rows_s)
-              all_rows_casedoc.extend(rows_c)
+                  rows_c.append(row)
+                  # Call function and increment counter if true
+                  if is_expected("casedoc", q["id"], hit.id):
+                      casedoc_precision += 1
+             
+              statute_precision, casedoc_precision = statute_precision / len(rows_s), casedoc_precision / len(rows_c)
+
+              if rows_s:
+                  divider_s = {"query_id": f"--- Query: {q['id']}, Precision: {statute_precision} (Model: {model_name}) ---"}
+                  all_rows_statute.append(divider_s)
+                  all_rows_statute.extend(rows_s)
+                  all_rows_statute.append({}) # Add a blank row for spacing
+
+              if rows_c:
+                  divider_c = {"query_id": f"--- Query: {q['id']}, Precision: {casedoc_precision} (Model: {model_name}) ---"}
+                  all_rows_casedoc.append(divider_c)
+                  all_rows_casedoc.extend(rows_c)
+                  all_rows_casedoc.append({})
+
 
               # Optional console preview
-              print(f"\nQuery ID: {q['id']} (Model: {model_name}) - Statutes")
+              print(f"\nQuery ID: {q['id']} (Model: {model_name}) (Precision:{statute_precision}) - Statutes")
               print(pd.DataFrame(rows_s)[["rank","id","chunk","score"]])
-              print(f"\nQuery ID: {q['id']} (Model: {model_name}) - CaseDocs")
+              print(f"\nQuery ID: {q['id']} (Model: {model_name}) (Precision:{casedoc_precision}) - CaseDocs")
               print(pd.DataFrame(rows_c)[["rank","id","chunk","score"]])
 
           queries_collection.release()
           statute_collection.release()
           casedoc_collection.release()
 
-        # Export to Excel with proper sheets
-        out_dir = Path("tests")
-        out_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        xlsx_path = out_dir / f"complex_similarity_results_{ts}.xlsx"
-
-        # with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
-        #     if all_rows_statute:
-        #         pd.DataFrame(all_rows_statute).to_excel(writer, sheet_name="Statutes", index=False)
-        #     if all_rows_casedoc:
-        #         pd.DataFrame(all_rows_casedoc).to_excel(writer, sheet_name="CaseDocs", index=False)
-
-        # print(f"\nExcel saved to {xlsx_path}")
+        self.xlsx_print(all_rows_statute, all_rows_casedoc)
         time.sleep(1)

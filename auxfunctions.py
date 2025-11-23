@@ -1,8 +1,9 @@
 import os, time
 from pathlib import Path
 import numpy as np
-import pandas as pdz
+import pandas as pd
 from pymilvus import Collection, DataType, utility
+import re
 
 def read_file(p): 
     with open(p, 'r', encoding='utf-8') as f: return f.read()
@@ -127,7 +128,7 @@ def average_chars_in_textfiles(dir_path):
     print(f"Char number avg in {dir_path}: {avg}")
     return avg
 
-def expected_outcome(input_type, query_id, doc_id):
+def is_expected(input_type, query_id, doc_id):
   """
   Process the input file based on the input type (statute or priorcase) 
   and query ID to match specific lines.
@@ -141,9 +142,9 @@ def expected_outcome(input_type, query_id, doc_id):
   """
   # Determine the input file based on the input type
   if input_type == "statute":
-    input_file = "../archive/relevance_judgments_statutes.txt"
+    input_file = "./archive/relevance_judgments_statutes.txt"
   elif input_type == "casedoc":
-    input_file = "../archive/relevance_judgments_priorcases.txt"
+    input_file = "./archive/relevance_judgments_priorcases.txt"
   else:
     raise ValueError("Invalid input type. Use 'statute' or 'priorcase'.")
 
@@ -153,4 +154,6 @@ def expected_outcome(input_type, query_id, doc_id):
       # Match lines based on the query ID and input type
       pattern = rf"^{query_id} Q0 {doc_id} 1$"
       if re.match(pattern, line.strip()):
-        print(line.strip())
+        return True
+  
+  return False
