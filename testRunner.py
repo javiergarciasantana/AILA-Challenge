@@ -127,14 +127,13 @@ class TestRunner:
           casedoc_collection = Collection(casedoc_docs_col_name)
           casedoc_collection.load()
 
+          metric = "COSINE" if model_name.startswith('bge') else "L2"
           search_params = {
-            "metric_type": "L2",
+            "metric_type": metric,
             "offset": 0,
             "ignore_growing": False,
             "params": {"nprobe": 10}
           }
-          
-
           query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
           for q in query_results:
               casedoc_precision = 0
@@ -157,36 +156,39 @@ class TestRunner:
               )
               rows_s = []
               for i, hit in enumerate(results_s[0]):
+                  if is_expected("statute", q["id"], hit.id):
+                      statute_precision += 1
+                      flag = "✧"
+                  else : flag = ''
                   row = {
                       "query_id": q["id"],
                       "model": model_name,
                       "target": "statute",
                       "rank": i + 1,
-                      "id": hit.id,
+                      "id": str(hit.id) + flag,
                       "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
                       "score": float(hit.distance),
                   }
                   rows_s.append(row)
-                  # Call function and increment counter if true
-                  if is_expected("statute", q["id"], hit.id):
-                      statute_precision += 1
 
               # --- Process Casedoc Results with a for loop ---
               rows_c = []
               for i, hit in enumerate(results_c[0]):
+
+                  if is_expected("casedoc", q["id"], hit.id):
+                      casedoc_precision += 1
+                      flag = "✧"
+                  else : flag = ''
                   row = {
                       "query_id": q["id"],
                       "model": model_name,
                       "target": "casedoc",
                       "rank": i + 1,
-                      "id": hit.id,
+                      "id": str(hit.id) + flag,
                       "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
                       "score": float(hit.distance),
                   }
                   rows_c.append(row)
-                  # Call function and increment counter if true
-                  if is_expected("casedoc", q["id"], hit.id):
-                      casedoc_precision += 1
              
               statute_precision, casedoc_precision = statute_precision / len(rows_s), casedoc_precision / len(rows_c)
 

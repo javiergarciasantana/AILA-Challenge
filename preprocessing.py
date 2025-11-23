@@ -33,7 +33,7 @@ def cs_proc(option, path):
 
   #Let the user choose the embedding model to use
   title = f'Please choose your preferred {option} embedding model: '
-  options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'back']
+  options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en', 'back']
   
   selected_model, model_num = pick(options, title, indicator='=>', default_index=1)
 
@@ -50,10 +50,11 @@ def cs_proc(option, path):
   # all-MiniLM-L6-v2: 88328 chunks Casedocs | 738 chunks statutes
   # multi-qa-mpnet-base-dot-v1: 38364 chunks Casedocs | 387 chunks statutes
   # all-distilroberta_v1: 38364 chunks Casedocs | 387 chunks statutes
+  # bge-base-en-v1.5: 57634 chunks Casedocs | 505 chunks statutes
 
   # --- 3. Chunk the Documents ---
-  chunk_sizes = [1500, 1000, 2200, 2200]
-  chunk_overlaps = [250, 200, 300, 300]
+  chunk_sizes = [1500, 1000, 2200, 2200, 1500, 1500]
+  chunk_overlaps = [250, 200, 300, 300, 200, 200]
   print(chunk_sizes[model_num])
   text_splitter = RecursiveCharacterTextSplitter(
       chunk_size=chunk_sizes[model_num],
@@ -76,7 +77,7 @@ def cs_proc(option, path):
   print(f"Loaded {len(docs)} documents and split into {len(chunked_docs)} chunks.")
 
   # --- 4. Generate Embeddings ---
-
+    
   # Load a free embedding model (runs locally)
   print(f"Running {selected_model} embedding model for {option}...\n")
   model = SentenceTransformer(selected_model)
@@ -87,9 +88,13 @@ def cs_proc(option, path):
       show_progress_bar=True, 
       convert_to_numpy=True)
 
-  texts = [d["text"] for d in chunked_docs]
+  if selected_model.startswith('BAAI'):
+      instruction = f"Represent this {option} for retrieval: "
+      texts = [instruction + d["text"] for d in chunked_docs]
+  else: 
+    texts = [d["text"] for d in chunked_docs]
+  
   embeddings = embed_text(texts)
-
   print("Saving the" + selected_model + "embeddings into .tsv files...\n")
   save_embeddings_cs(embeddings, chunked_docs, option, all_underscores(selected_model))
 
@@ -103,7 +108,7 @@ def q_proc():
   }
   # We are omitting the chunking since the queries are at around 1000 char long
 
-  selected_models = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1']
+  selected_models = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en']
   def embed_text(texts):
     return model.encode(texts, 
     batch_size=64, 
@@ -111,10 +116,15 @@ def q_proc():
     convert_to_numpy=True)
   
   for model_name in selected_models:
-    model = SentenceTransformer(f"sentence-transformers/{model_name}")
+    model = SentenceTransformer(model_name)
   
     # Prepare texts and IDs
     texts = list(test_queries.values())
+
+    if model_name.startswith('BAAI'):
+      instruction = f"Represent this sentence for searching relevant passages: "
+      texts = [instruction + t for t in texts]
+
     ids = list(test_queries.keys())
     embeddings = embed_text(texts)
 

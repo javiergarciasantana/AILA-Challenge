@@ -1,5 +1,5 @@
 from pymilvus import connections, MilvusException
-from auxfunctions import load_embeddings, visualize_collections, average_chars_in_textfiles
+from auxfunctions import load_embeddings, visualize_collections, average_chars_in_textfiles, shutdown, milvus_connect
 import sys
 import time
 from menu import Menu
@@ -48,18 +48,13 @@ def load_test_queries(models):
     print("\nFinished loading test queries.")
     time.sleep(2)
 
-
 def main():
   
-  models = ['all_mpnet_base_v2', 'all_MiniLM_L6_v2', 'multi_qa_mpnet_base_dot_v1', 'all_distilroberta_v1']
+  models = ['all_mpnet_base_v2', 'all_MiniLM_L6_v2', 'multi_qa_mpnet_base_dot_v1', 'all_distilroberta_v1', 'bge_base_en_v15', 'bge_small_en']
 
   #Connect to Milvus
-  try:
-    connections.connect("default", host="localhost", port="19530")
-    print("✅ Successfully connected to Milvus container!")
-  except MilvusException as e:
-    print(f"❌ Failed to connect to Milvus: {e}")
-    sys.exit(1)
+  if not milvus_connect():
+      shutdown()
 
   # Initialize the test runner
   test_runner = TestRunner(models)
@@ -68,8 +63,8 @@ def main():
   test_menu = Menu(
       title='Please choose which test to run:',
       options=[
-          ('Perform simple similarity test', test_runner.run_simple_similarity),
           ('Perform complex similarity test', test_runner.run_complex_similarity),
+          ('Perform simple similarity test', test_runner.run_simple_similarity),
           ('Back', None)
       ]
   )
@@ -78,21 +73,18 @@ def main():
   main_menu = Menu(
       title='Please choose what you wish to do:',
       options=[
+          ('Run Tests', test_menu.show),
           ('Preprocessing of data', preprocessing_menu),
           ('Load Casedoc & Statutes', lambda: (load_case_docs_and_statutes(models, "casedoc"), 
                                                load_case_docs_and_statutes(models, "statute"))),
           ('Load Test Queries', lambda: load_test_queries(models)),
-          ('Run Tests', test_menu.show),
           ('Visualize Collections', visualize_collections),
           ('Average chars in casedocs & statutes', lambda:(average_chars_in_textfiles("./archive/Object_casedocs"),
                                                            average_chars_in_textfiles("./archive/Object_statutes"))),
-          ('Exit', sys.exit)
+          ('Exit', shutdown())
       ]
   )
-
   main_menu.show()
-  print("Exiting program.")
-
 
 if __name__ == "__main__" :
   main()

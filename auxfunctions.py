@@ -2,8 +2,26 @@ import os, time
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from pymilvus import Collection, DataType, utility
+from pymilvus import Collection, DataType, utility, connections, MilvusException
+import sys
 import re
+
+def shutdown():
+  try:
+      connections.disconnect("default")
+  except MilvusException as e:
+      print(f"❌ Error while disconnecting: {e}")
+  
+  sys.exit()
+
+def milvus_connect() -> bool:
+  try:
+    connections.connect("default", host="localhost", port="19530")
+    print("✅ Successfully connected to Milvus container!")
+    return True
+  except MilvusException as e:
+    print(f"❌ Failed to connect to Milvus: {e}")
+    return False
 
 def read_file(p): 
     with open(p, 'r', encoding='utf-8') as f: return f.read()
@@ -45,6 +63,8 @@ def visualize_docs(d):
 def all_underscores(name): return name.replace("-","_")
 
 def save_embeddings_cs(embeddings, chunks, kind, model):
+    if model.startswith('BAAI/'):
+      model = model[5:]
     dir_path = Path("export")/model/kind
     dir_path.mkdir(parents=True, exist_ok=True)
     try:
