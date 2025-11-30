@@ -22,7 +22,7 @@ import os
 from pick import pick
 import sys
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection
-from auxfunctions import load_objects,load_queries, visualize_docs, save_embeddings_cs, save_embeddings_q, all_underscores
+from auxfunctions import load_objects,load_queries, visualize_docs, save_embeddings_cs, save_embeddings_q, all_underscores, chunk_text
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from menu import Menu
@@ -33,7 +33,7 @@ def cs_proc(option, path):
 
   #Let the user choose the embedding model to use
   title = f'Please choose your preferred {option} embedding model: '
-  options = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en', 'back']
+  options = ['BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en', 'back']
   
   selected_model, model_num = pick(options, title, indicator='=>', default_index=1)
 
@@ -52,47 +52,66 @@ def cs_proc(option, path):
   # all-distilroberta_v1: 38364 chunks Casedocs | 387 chunks statutes
   # bge-base-en-v1.5: 57634 chunks Casedocs | 505 chunks statutes
 
-  # --- 3. Chunk the Documents ---
-  chunk_sizes = [1500, 1000, 2200, 2200, 1500, 1500]
-  chunk_overlaps = [250, 200, 300, 300, 200, 200]
-  print(chunk_sizes[model_num])
-  text_splitter = RecursiveCharacterTextSplitter(
-      chunk_size=chunk_sizes[model_num],
-      chunk_overlap=chunk_overlaps[model_num],  # Add overlap to maintain context between chunks
-      length_function=len,
-  )
-  chunked_docs = []
-  for doc in docs:
-      chunks = text_splitter.split_text(doc["text"])
-      for i, chunk in enumerate(chunks):
+  # --- 3. Chunk the Documents (Optional) ---
+  chunking_title = f'Do you want to chunk the {option} documents before embedding?'
+  chunking_options = ['Yes', 'No']
+  chunking_choice, _ = pick(chunking_options, chunking_title, indicator='=>', default_index=0)
+
+  if chunking_choice == 'Yes':
+      # chunk_sizes = [1500, 1000, 2200, 2200, 1000, 800]
+      # chunk_overlaps = [250, 200, 300, 300, 200, 200]
+      # print(chunk_sizes[model_num])
+      # text_splitter = RecursiveCharacterTextSplitter(
+      #     chunk_size=chunk_sizes[model_num],
+      #     chunk_overlap=chunk_overlaps[model_num],  # Add overlap to maintain context between chunks
+      #     length_function=len,
+      # )
+      chunked_docs = []
+      for doc in docs:
+          chunks = chunk_text(doc["text"])
+          for i, chunk in enumerate(chunks):
+              chunked_docs.append({
+                  "text": chunk,
+                  "type": doc["type"],
+                  "id": doc["id"],
+                  "chunk": f"chunk{i}" 
+              })
+      print(f"Loaded {len(docs)} documents and split into {len(chunked_docs)} chunks.")
+  else:
+      # No chunking, treat each document as a single chunk
+      chunked_docs = []
+      for doc in docs:
           chunked_docs.append({
-              "text": chunk,
+              "text": doc["text"],
               "type": doc["type"],
               "id": doc["id"],
-              "chunk": f"chunk{i}" 
+              "chunk": "chunk0"
           })
-
-
-  #visualize_docs(chunks)
-  print(f"Loaded {len(docs)} documents and split into {len(chunked_docs)} chunks.")
+      print(f"Loaded {len(docs)} documents with no chunking.")
 
   # --- 4. Generate Embeddings ---
-    
-  # Load a free embedding model (runs locally)
   print(f"Running {selected_model} embedding model for {option}...\n")
   model = SentenceTransformer(selected_model)
 
   def embed_text(texts):
-      return model.encode(texts, 
-      batch_size=64, 
-      show_progress_bar=True, 
-      convert_to_numpy=True)
+      return model.encode(
+          texts,
+          show_progress_bar=True,
+          normalize_embeddings=True if selected_model.startswith('BAAI') else False
+  )
 
+  # Update the "text" field in chunked_docs if using BAAI models to include the instruction
   if selected_model.startswith('BAAI'):
-      instruction = f"Represent this {option} for retrieval: "
-      texts = [instruction + d["text"] for d in chunked_docs]
-  else: 
-    texts = [d["text"] for d in chunked_docs]
+      if option == "casedoc":
+          instruction = "Represent this case for retrieval: "
+      elif option == "statute":
+          instruction = "Represent this statute for retrieval: "
+      for d in chunked_docs:
+          d["text"] = instruction + d["text"]
+      texts = [d["text"] for d in chunked_docs]
+  else:
+      texts = [d["text"] for d in chunked_docs]
+
   
   embeddings = embed_text(texts)
   print("Saving the" + selected_model + "embeddings into .tsv files...\n")
@@ -108,12 +127,14 @@ def q_proc():
   }
   # We are omitting the chunking since the queries are at around 1000 char long
 
-  selected_models = ['all-mpnet-base-v2', 'all-MiniLM-L6-v2', 'multi-qa-mpnet-base-dot-v1', 'all-distilroberta-v1', 'BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en']
+  selected_models = ['BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en']
   def embed_text(texts):
     return model.encode(texts, 
     batch_size=64, 
     show_progress_bar=True, 
-    convert_to_numpy=True)
+    convert_to_numpy=True,
+    normalize_embeddings=True if model_name.startswith('BAAI') else False
+  )
   
   for model_name in selected_models:
     model = SentenceTransformer(model_name)

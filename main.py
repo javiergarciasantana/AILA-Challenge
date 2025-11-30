@@ -1,5 +1,5 @@
 from pymilvus import connections, MilvusException
-from auxfunctions import load_embeddings, visualize_collections, average_chars_in_textfiles, shutdown, milvus_connect
+from auxfunctions import load_embeddings, visualize_collections, average_chars_in_textfiles
 import sys
 import time
 from menu import Menu
@@ -50,11 +50,15 @@ def load_test_queries(models):
 
 def main():
   
-  models = ['all_mpnet_base_v2', 'all_MiniLM_L6_v2', 'multi_qa_mpnet_base_dot_v1', 'all_distilroberta_v1', 'bge_base_en_v15', 'bge_small_en']
+  models = ['bge_base_en_v15', 'bge_small_en']
 
   #Connect to Milvus
-  if not milvus_connect():
-      shutdown()
+  try:
+    connections.connect("default", host="localhost", port="19530")
+    print("✅ Successfully connected to Milvus container!")
+  except MilvusException as e:
+    print(f"❌ Failed to connect to Milvus: {e}")
+    sys.exit(1)
 
   # Initialize the test runner
   test_runner = TestRunner(models)
@@ -65,6 +69,7 @@ def main():
       options=[
           ('Perform complex similarity test', test_runner.run_complex_similarity),
           ('Perform simple similarity test', test_runner.run_simple_similarity),
+          ('BGE base en POC', test_runner.run_bge_small_queries_on_bge_base_en_casedocs),
           ('Back', None)
       ]
   )
@@ -81,10 +86,11 @@ def main():
           ('Visualize Collections', visualize_collections),
           ('Average chars in casedocs & statutes', lambda:(average_chars_in_textfiles("./archive/Object_casedocs"),
                                                            average_chars_in_textfiles("./archive/Object_statutes"))),
-          ('Exit', shutdown())
+          ('Exit', print("exit"))
       ]
   )
   main_menu.show()
 
 if __name__ == "__main__" :
   main()
+  connections.disconnect("default")

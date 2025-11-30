@@ -1,5 +1,5 @@
 from pymilvus import Collection, utility
-from auxfunctions import load_embeddings, is_expected
+from auxfunctions import load_embeddings, is_expected, count_expected, aggregate_by_case
 import pandas as pd
 import time
 import os
@@ -132,12 +132,14 @@ class TestRunner:
             "metric_type": metric,
             "offset": 0,
             "ignore_growing": False,
-            "params": {"nprobe": 10}
+            "params": {"nprobe": 50}
           }
           query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
           for q in query_results:
-              casedoc_precision = 0
               statute_precision = 0
+              casedoc_precision = 0
+              statute_count = 0
+              casedoc_count = 0
 
               results_s = statute_collection.search(
                   data=[q["embedding"]],
@@ -151,11 +153,12 @@ class TestRunner:
                   data=[q["embedding"]],
                   anns_field="embedding",
                   param=search_params,
-                  limit=20,
+                  limit=30,
                   output_fields=["id", "chunk"]
               )
               rows_s = []
               for i, hit in enumerate(results_s[0]):
+                  statute_count = (count_expected("statute", q["id"]))
                   if is_expected("statute", q["id"], hit.id):
                       statute_precision += 1
                       flag = "✧"
@@ -174,7 +177,7 @@ class TestRunner:
               # --- Process Casedoc Results with a for loop ---
               rows_c = []
               for i, hit in enumerate(results_c[0]):
-
+                  casedoc_count = (count_expected("casedoc", q["id"]))
                   if is_expected("casedoc", q["id"], hit.id):
                       casedoc_precision += 1
                       flag = "✧"
@@ -190,7 +193,7 @@ class TestRunner:
                   }
                   rows_c.append(row)
              
-              statute_precision, casedoc_precision = statute_precision / len(rows_s), casedoc_precision / len(rows_c)
+              statute_precision, casedoc_precision = statute_precision / statute_count, casedoc_precision / casedoc_count
 
               if rows_s:
                   divider_s = {"query_id": f"--- Query: {q['id']}, Precision: {statute_precision} (Model: {model_name}) ---"}
@@ -204,16 +207,98 @@ class TestRunner:
                   all_rows_casedoc.extend(rows_c)
                   all_rows_casedoc.append({})
 
-
+              agg_rows_c = aggregate_by_case(rows_c)
               # Optional console preview
+              relevant_ids = set()
+              with open("./archive/relevance_judgments_priorcases.txt") as f:
+                  for line in f:
+                    parts = line.strip().split()
+                    if len(parts) == 4 and parts[0] == q["id"] and parts[3] == "1":
+                        relevant_ids.add(parts[2])
+
               print(f"\nQuery ID: {q['id']} (Model: {model_name}) (Precision:{statute_precision}) - Statutes")
               print(pd.DataFrame(rows_s)[["rank","id","chunk","score"]])
               print(f"\nQuery ID: {q['id']} (Model: {model_name}) (Precision:{casedoc_precision}) - CaseDocs")
-              print(pd.DataFrame(rows_c)[["rank","id","chunk","score"]])
+              print(pd.DataFrame(agg_rows_c)[["rank","id","chunk","score"]])
 
+              print("Relevant casedoc IDs for", q["id"], ":", relevant_ids)
+              print("Top retrieved casedoc IDs:", [row["id"].split()[0] for row in agg_rows_c[:10]])
+          
           queries_collection.release()
           statute_collection.release()
           casedoc_collection.release()
 
         self.xlsx_print(all_rows_statute, all_rows_casedoc)
         time.sleep(1)
+
+
+
+    def run_bge_small_queries_on_bge_base_en_casedocs(self):
+      """
+      Uses the 'bge-small-en' test queries to search in the 'casedoc_bge-base-en' collection.
+      Prints and saves the results.
+      """
+      queries_col_name = "test_queries_bge_base_en_v15"
+      casedoc_col_name = "casedoc_bge_base_en_v15"
+
+      casedoc_precision = 0
+
+      if not (utility.has_collection(queries_col_name) and utility.has_collection(casedoc_col_name)):
+        print(f"Required collections '{queries_col_name}' or '{casedoc_col_name}' not found.")
+        return
+
+      queries_collection = Collection(queries_col_name)
+      queries_collection.load()
+      casedoc_collection = Collection(casedoc_col_name)
+      casedoc_collection.load()
+
+      search_params = {
+        "metric_type": "COSINE",
+        "offset": 0,
+        "ignore_growing": False,
+        "params": {"nprobe": 50}
+      }
+
+      query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding"])
+
+      for q in query_results:
+        results = casedoc_collection.search(
+          data=[q["embedding"]],
+          anns_field="embedding",
+          param=search_params,
+          limit=20,
+          output_fields=["id", "chunk"]
+        )
+        rows = []
+        for i, hit in enumerate(results[0]):
+          casedoc_count = (count_expected("casedoc", q["id"]))
+          if is_expected("casedoc", q["id"], hit.id):
+              casedoc_precision += 1
+              flag = "✧"
+          else : flag = ''
+          row = {
+            "query_id": q["id"],
+            "model": "bge-base-en",
+            "target": "casedoc",
+            "rank": i + 1,
+            "id": str(hit.id) + flag,
+            "chunk": (hit.entity.get("chunk") if hasattr(hit, "entity") else None),
+            "score": float(hit.distance),
+          }
+          rows.append(row)
+
+        casedoc_precision = casedoc_precision / casedoc_count
+
+        print(f"\nQuery ID: {q['id']} Precision: {casedoc_precision}  ({casedoc_col_name[8:]})")
+        print(pd.DataFrame(rows)[["rank", "id", "chunk", "score"]])
+        relevant_ids = set()
+        with open("./archive/relevance_judgments_priorcases.txt") as f:
+            for line in f:
+              parts = line.strip().split()
+              if len(parts) == 4 and parts[0] == q["id"] and parts[3] == "1":
+                  relevant_ids.add(parts[2])
+        
+        print("Relevant casedoc IDs for", q["id"], ":", relevant_ids)
+
+      queries_collection.release()
+      casedoc_collection.release()

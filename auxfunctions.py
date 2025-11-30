@@ -5,18 +5,13 @@ import pandas as pd
 from pymilvus import Collection, DataType, utility, connections, MilvusException
 import sys
 import re
+import spacy
 
-def shutdown():
-  try:
-      connections.disconnect("default")
-  except MilvusException as e:
-      print(f"❌ Error while disconnecting: {e}")
-  
-  sys.exit()
 
 def milvus_connect() -> bool:
   try:
     connections.connect("default", host="localhost", port="19530")
+    utility.list_collections()
     print("✅ Successfully connected to Milvus container!")
     return True
   except MilvusException as e:
@@ -84,6 +79,8 @@ def save_embeddings_cs(embeddings, chunks, kind, model):
         return False
 
 def save_embeddings_q(embeddings, texts, ids, model):
+    if model.startswith("BAAI/"):
+      model = model[5:]
     dir_path = Path("export/queries")/model
     dir_path.mkdir(parents=True, exist_ok=True)
     try:
@@ -177,3 +174,55 @@ def is_expected(input_type, query_id, doc_id):
         return True
   
   return False
+
+
+def count_expected(input_type, query_id):
+  counter = 0
+  # Determine the input file based on the input type
+  if input_type == "statute":
+    input_file = "./archive/relevance_judgments_statutes.txt"
+  elif input_type == "casedoc":
+    input_file = "./archive/relevance_judgments_priorcases.txt"
+  else:
+    raise ValueError("Invalid input type. Use 'statute' or 'priorcase'.")
+
+  # Open the file and process it
+  with open(input_file, "r") as file:
+    for line in file:
+      # Match lines based on the query ID and input type
+      pattern = rf"^{query_id} Q0 .+ 1$"
+      if re.match(pattern, line.strip()):
+        counter += 1
+  
+  return counter
+
+# After collecting rows_c (list of dicts with "id" like "C179 chunk2")
+def aggregate_by_case(rows):
+    from collections import defaultdict
+    agg = defaultdict(list)
+    for row in rows:
+        case_id = row["id"].split()[0]  # or use regex if needed
+        agg[case_id].append(row)
+    # Keep the best scoring chunk per case
+    best_per_case = [max(chunks, key=lambda x: x["score"]) for chunks in agg.values()]
+    # Sort by score descending
+    return sorted(best_per_case, key=lambda x: x["score"], reverse=True)
+
+
+def chunk_text(text, chunk_size=1000, overlap=200):
+    import spacy
+    nlp = spacy.blank("en")
+    nlp.add_pipe("sentencizer")
+    doc = nlp(text)
+    sentences = [sent.text for sent in doc.sents]
+    chunks = []
+    current = ""
+    for sent in sentences:
+        if len(current) + len(sent) <= chunk_size:
+            current += " " + sent
+        else:
+            chunks.append(current.strip())
+            current = current[-overlap:] + " " + sent
+    if current:
+        chunks.append(current.strip())
+    return chunks
