@@ -37,6 +37,7 @@ class CaseStatuteStorer:
           FieldSchema(name="chunk", dtype=DataType.VARCHAR, max_length=20),
           FieldSchema(name="type", dtype=DataType.VARCHAR, max_length=20),
           FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
+          FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=30000),
       ]
       schema = CollectionSchema(fields, description=f"{self.kind} embeddings")
       collection = Collection(self.collection_name, schema)
@@ -48,8 +49,9 @@ class CaseStatuteStorer:
           batch_chunks = meta_df["chunk"][i:i+batch_size].tolist()
           batch_types = meta_df["type"][i:i+batch_size].tolist()
           batch_embeddings = embeddings[i:i+batch_size].tolist()
+          batch_texts = meta_df["text"][i:i+batch_size].tolist()
 
-          collection.insert([batch_ids, batch_chunks, batch_types, batch_embeddings])
+          collection.insert([batch_ids, batch_chunks, batch_types, batch_embeddings, batch_texts])
 
       collection.flush()
       print(f"✅ Inserted {collection.num_entities} entities into '{self.collection_name}'.")
@@ -89,15 +91,17 @@ class QueryStorer:
         fields = [
             FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=20),
             FieldSchema(name="model", dtype=DataType.VARCHAR, max_length=50),
-            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim)
+            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
+            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=30000),
         ]
         schema = CollectionSchema(fields, description="Test queries embeddings")
         collection = Collection(collection_name, schema)
 
         ids = meta_df["id"].tolist()
         model_col = meta_df["model"].tolist()
+        text_col = meta_df["text"].tolist()
 
-        collection.insert([ids, model_col, embeddings.tolist()])
+        collection.insert([ids, model_col, embeddings.tolist(), text_col])
         collection.flush()
         ensure_index(collection_name, self.model_name, index_type="FLAT")
 

@@ -69,7 +69,6 @@ def main():
       options=[
           ('Perform complex similarity test', test_runner.run_complex_similarity),
           ('Perform simple similarity test', test_runner.run_simple_similarity),
-          ('BGE base en POC', test_runner.run_bge_small_queries_on_bge_base_en_casedocs),
           ('Back', None)
       ]
   )

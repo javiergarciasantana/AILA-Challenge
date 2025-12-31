@@ -68,7 +68,7 @@ def save_embeddings_cs(embeddings, chunks, kind, model):
             "id":[c["id"] for c in chunks],
             "chunk":[c["chunk"] for c in chunks],
             "type":[c["type"] for c in chunks],
-            "text":[c["text"][:200].replace("\n"," ") for c in chunks]
+            "text":[c["text"].replace("\n"," ") for c in chunks]
         })
         md.to_csv(dir_path/"metadata.tsv", sep="\t", index=False)
         print("✅ Embeddings saved successfully.")
@@ -226,3 +226,104 @@ def chunk_text(text, chunk_size=1000, overlap=200):
     if current:
         chunks.append(current.strip())
     return chunks
+
+
+from sentence_transformers import CrossEncoder
+
+# 1. Global variable to store the model instance (Singleton Pattern)
+_reranker_model = None
+
+def get_reranker():
+    """
+    Loads the model only once.
+    Using 'BAAI/bge-reranker-v2-m3' for better legal reasoning and longer context support.
+    """
+    global _reranker_model
+    if _reranker_model is None:
+        print("Loading Reranker Model (this happens only once)...")
+        # 'BAAI/bge-reranker-v2-m3' is state-of-the-art and supports longer sequences.
+        # We set max_length=1024 to capture more text than the standard 512 limit.
+        try:
+            _reranker_model = CrossEncoder('BAAI/bge-reranker-v2-m3', max_length=1024, trust_remote_code=True)
+        except:
+            # Fallback to 'large' if v2-m3 causes environment issues
+            print("Falling back to bge-reranker-large...")
+            _reranker_model = CrossEncoder('BAAI/bge-reranker-large', max_length=512)
+    return _reranker_model
+
+def rerank_with_cross_encoder(query, candidates, top_n=10):
+    """
+    Reranks candidates using a CrossEncoder.
+    """
+    if not candidates:
+        return []
+
+    # Load model (cached)
+    cross_encoder = get_reranker()
+
+    # Prepare pairs: (Query, Document Text)
+    # Ensure text is a string to avoid errors
+    pairs = [(str(query), str(cand.get('text', ''))) for cand in candidates]
+
+    # Predict scores
+    scores = cross_encoder.predict(pairs)
+
+    # Assign scores back to candidates
+    for cand, score in zip(candidates, scores):
+        cand['rerank_score'] = score
+
+    # Sort all candidates by rerank_score (descending)
+    reranked = sorted(candidates, key=lambda x: x['rerank_score'], reverse=True)
+
+    # Cleanup helper field
+    for cand in reranked:
+        cand.pop('rerank_score', None)
+
+    return reranked[:top_n]
+
+
+
+
+
+
+
+
+
+
+  #  def rerank_with_cross_encoder(query, candidates, top_n=10):
+  #   # Store original indices
+  #   for idx, cand in enumerate(candidates):
+  #       cand['orig_rank'] = idx
+
+  #   cross_encoder = CrossEncoder('BAAI/bge-reranker-base')
+  #   pairs = [(query, cand['text']) for cand in candidates]
+  #   scores = cross_encoder.predict(pairs)
+  #   for cand, score in zip(candidates, scores):
+  #       cand['rerank_score'] = score
+
+  #   # Sort by rerank_score (descending)
+  #   reranked = sorted(candidates, key=lambda x: x['rerank_score'], reverse=True)
+
+  #   # Build final list: keep candidate at original position if its orig_rank < reranked position
+  #   final = [None] * len(candidates)
+  #   used = set()
+  #   for new_idx, cand in enumerate(reranked):
+  #       orig_idx = cand['orig_rank']
+  #       flag = cand['id'][-1]
+  #       if orig_idx <= new_idx and orig_idx not in used and flag == '✧':
+  #           final[orig_idx] = cand
+  #           used.add(orig_idx)
+  #       else:
+  #           # Find next available slot from new_idx onwards
+  #           for i in range(new_idx, len(candidates)):
+  #               if final[i] is None:
+  #                   cand["id"] += "↑"
+  #                   final[i] = cand
+  #                   break
+
+  #   # Remove helper field and trim to top_n
+  #   final = [cand for cand in final if cand is not None]
+  #   for cand in final:
+  #       cand.pop('orig_rank', None)
+  #       cand.pop('rerank_score', None)
+  #   return final[:top_n]
