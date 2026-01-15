@@ -1,0 +1,58 @@
+Cargando Ground Truth...
+Evaluando retrieval_results_final.txt...
+
+--- Resultados de Recall (Cobertura) ---
+AILA_Q1: Encontrados 1/6. Recall: 16.67%
+AILA_Q10: Encontrados 0/8. Recall: 0.00%
+AILA_Q11: Encontrados 2/6. Recall: 33.33%
+AILA_Q12: Encontrados 1/5. Recall: 20.00%
+AILA_Q13: Encontrados 1/8. Recall: 12.50%
+AILA_Q14: Encontrados 1/6. Recall: 16.67%
+AILA_Q15: Encontrados 0/5. Recall: 0.00%
+AILA_Q16: Encontrados 0/7. Recall: 0.00%
+AILA_Q17: Encontrados 0/5. Recall: 0.00%
+AILA_Q18: Encontrados 0/5. Recall: 0.00%
+AILA_Q19: Encontrados 0/9. Recall: 0.00%
+AILA_Q2: Encontrados 1/5. Recall: 20.00%
+AILA_Q20: Encontrados 0/6. Recall: 0.00%
+AILA_Q21: Encontrados 1/8. Recall: 12.50%
+AILA_Q22: Encontrados 1/7. Recall: 14.29%
+AILA_Q23: Encontrados 1/7. Recall: 14.29%
+AILA_Q24: Encontrados 0/6. Recall: 0.00%
+AILA_Q25: Encontrados 2/11. Recall: 18.18%
+AILA_Q26: Encontrados 3/13. Recall: 23.08%
+AILA_Q27: Encontrados 4/9. Recall: 44.44%
+AILA_Q28: Encontrados 0/6. Recall: 0.00%
+AILA_Q29: Encontrados 1/26. Recall: 3.85%
+AILA_Q3: Encontrados 1/5. Recall: 20.00%
+AILA_Q30: Encontrados 2/15. Recall: 13.33%
+AILA_Q31: Encontrados 0/7. Recall: 0.00%
+AILA_Q32: Encontrados 0/7. Recall: 0.00%
+AILA_Q33: Encontrados 1/5. Recall: 20.00%
+AILA_Q34: Encontrados 2/18. Recall: 11.11%
+AILA_Q35: Encontrados 0/7. Recall: 0.00%
+AILA_Q36: Encontrados 1/11. Recall: 9.09%
+AILA_Q37: Encontrados 1/7. Recall: 14.29%
+AILA_Q38: Encontrados 2/9. Recall: 22.22%
+AILA_Q39: Encontrados 1/17. Recall: 5.88%
+AILA_Q4: Encontrados 0/5. Recall: 0.00%
+AILA_Q40: Encontrados 1/6. Recall: 16.67%
+AILA_Q41: Encontrados 0/10. Recall: 0.00%
+AILA_Q42: Encontrados 0/9. Recall: 0.00%
+AILA_Q43: Encontrados 0/8. Recall: 0.00%
+AILA_Q44: Encontrados 1/10. Recall: 10.00%
+AILA_Q45: Encontrados 0/6. Recall: 0.00%
+AILA_Q46: Encontrados 1/13. Recall: 7.69%
+AILA_Q47: Encontrados 1/6. Recall: 16.67%
+AILA_Q48: Encontrados 1/9. Recall: 11.11%
+AILA_Q49: Encontrados 2/8. Recall: 25.00%
+AILA_Q5: Encontrados 1/10. Recall: 10.00%
+AILA_Q50: Encontrados 1/5. Recall: 20.00%
+AILA_Q6: Encontrados 2/9. Recall: 22.22%
+AILA_Q7: Encontrados 1/5. Recall: 20.00%
+AILA_Q8: Encontrados 1/8. Recall: 12.50%
+AILA_Q9: Encontrados 0/7. Recall: 0.00%
+
+--- GLOBAL ---
+Total Encontrados: 44/416
+Recall Global: 10.58%
