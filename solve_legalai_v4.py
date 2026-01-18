@@ -28,8 +28,8 @@ CHUNK_SIZE = 512
 OVERLAP = 128
 TOP_K_CANDIDATES = 100  # Candidates per collection
 TOP_N_RERANK = 30       # Rerank top 30 from EACH list
-FINAL_K_CASES = 30       # Force 10 Cases
-FINAL_K_STATUTES = 30    # Force 10 Statutes
+FINAL_K_CASES = 30       # Force 30 Cases
+FINAL_K_STATUTES = 30    # Force 30 Statutes
 
 class TextProcessor:
     @staticmethod
@@ -63,7 +63,7 @@ class SearchSystem:
 
     def index_collection(self, documents, collection_name, is_statute=False):
         """Standard Indexing with Cache Check"""
-        print(f"\n⚙️  Preparing '{collection_name}' ({len(documents)} docs)...")
+        print(f"\nPreparing '{collection_name}' ({len(documents)} docs)...")
         
         all_chunks = []
         bm25_corpus = []
@@ -77,7 +77,7 @@ class SearchSystem:
                 bm25_corpus.append(TextProcessor.clean(chunk).split())
 
         # Train BM25
-        print(f"📊 Training BM25...")
+        print(f"Training BM25...")
         bm25_index = BM25Okapi(bm25_corpus)
         current_map = {i: c['doc_name'] for i, c in enumerate(all_chunks)}
         
@@ -96,7 +96,7 @@ class SearchSystem:
                 return
 
         # Generate Vectors
-        print(f"🧠 Generating Vectors for '{collection_name}'...")
+        print(f"Generating Vectors for '{collection_name}'...")
         if self.client.has_collection(collection_name):
             self.client.drop_collection(collection_name)
         
@@ -108,6 +108,7 @@ class SearchSystem:
         )
 
         batch_size = 64
+        #For loop with progress bar
         for i in tqdm(range(0, len(all_chunks), batch_size), desc="Vectors"):
             batch = all_chunks[i : i + batch_size]
             texts = [x['text'] for x in batch]

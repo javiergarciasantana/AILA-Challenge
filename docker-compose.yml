@@ -36,7 +36,7 @@ services:
 
   standalone:
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.3.5
+    image: milvusdb/milvus:v2.4.5
     command: ["milvus", "run", "standalone"]
     security_opt:
     - seccomp:unconfined
@@ -58,7 +58,26 @@ services:
       - "etcd"
       - "minio"
 
+  ollama:
+    container_name: ollama
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persist models so you don't download them every restart
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/ollama:/root/.ollama
+    restart: always
+
+  attu:
+    container_name: attu
+    image: zilliz/attu:v2.3.5
+    environment:
+      MILVUS_URL: standalone:19530
+    ports:
+      - "8000:3000" # Access Attu at http://localhost:8000
+    depends_on:
+      - standalone
+
 networks:
   default:
     name: milvus
-
