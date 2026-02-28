@@ -1,11 +1,10 @@
 import os
 import re
-import sys
 import glob
+import unicodedata
 import numpy as np
 from tqdm import tqdm
-from rank_bm25 import BM25Okapi
-from pymilvus import MilvusClient
+from pymilvus import MilvusClient, DataType
 from sentence_transformers import SentenceTransformer
 
 # --- CONFIGURACIÓN ---
@@ -13,50 +12,44 @@ BASE_DIR = "/Users/javiersantana/INF_2024_2025/Trabajo Fin de Grado/AILA-Challen
 PATH_CASES = os.path.join(BASE_DIR, "Object_casedocs")
 PATH_STATUTES = os.path.join(BASE_DIR, "Object_statutes")
 PATH_QUERIES = os.path.join(BASE_DIR, "Query_doc.txt")
-OUTPUT_FILE = "test_results/retrieval_results_v3.txt"
 
-#METRICS
-TREC_FILE = "test_results/v3/trec_rankings.txt"
+# ARCHIVOS DE SALIDA Y EVALUACIÓN
+os.makedirs("test_results/v_dense", exist_ok=True)
+TREC_FILE = "test_results/v_dense/trec_rankings.txt"
+OUTPUT_METRICS = "test_results/v_dense/eval_metrics.txt"
 QRELS_FILES = [
-    "archive/relevance_judgments_statutes.txt",
-    "archive/relevance_judgments_priorcases.txt"
+    os.path.join(BASE_DIR, "relevance_judgments_statutes.txt"),
+    os.path.join(BASE_DIR, "relevance_judgments_priorcases.txt")
 ]
-OUTPUT_METRICS = "test_results/v3/eval_metrics.txt"
-K_METRICS = 50
 
 MILVUS_URI = "http://localhost:19530"
-DIMENSION = 768
-# Modelo optimizado para leyes
-EMBEDDING_MODEL = "law-ai/InLegalBERT" # Si falla, usa "BAAI/bge-base-en-v1.5"
+EMBEDDING_MODEL = "./models/InLegalBERT-AILA-Tuned" 
 
-CHUNK_SIZE = 512
-CHUNK_OVERLAP = 128
+# PARÁMETROS
+CHUNK_SIZE = 300 # Palabras (Asegura no pasar de 512 tokens)
+CHUNK_OVERLAP = 50
 TOP_K_RETRIEVAL = 100
-RRF_K = 60
+K_METRICS = 60
 
 class TextProcessor:
     @staticmethod
-    def clean(text):
-        # Limpieza suave para no borrar números de leyes
-        text = text.lower()
+    def super_clean(text):
+        """
+        Limpiador estándar NLP robusto.
+        Mantiene la puntuación porque BERT la necesita para el contexto.
+        """
+        # 1. Normalizar caracteres Unicode (elimina acentos raros, espacios invisibles)
+        text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+        # 2. Eliminar URLs o links que ensucian el embedding
+        text = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
+        # 3. Eliminar saltos de línea múltiples y tabulaciones
+        text = re.sub(r'[\r\n\t]+', ' ', text)
+        # 4. Colapsar espacios múltiples en uno solo
         text = re.sub(r'\s+', ' ', text)
-        return text
+        return text.strip()
 
     @staticmethod
-    def extract_legal_keywords(text):
-        """
-        Intenta extraer menciones a leyes (Section X, Act Y) para potenciar BM25.
-        """
-        # Patrón para capturar "Section 302", "Article 14", "Penal Code"
-        pattern = r"(section\s+\d+|article\s+\d+|act\s+\d{4}|penal\s+code|constitution)"
-        matches = re.findall(pattern, text.lower())
-        if matches:
-            # Devuelve una cadena con las leyes repetidas para darles peso
-            return " ".join(matches * 3) + " " + text
-        return text
-
-    @staticmethod
-    def chunk_text(text, doc_name="DEBUG"):
+    def chunk_text(text):
         words = text.split()
         if not words: return []
         chunks = []
@@ -65,118 +58,99 @@ class TextProcessor:
             chunks.append(chunk)
         return chunks
 
-class SearchSystem:
+class DenseSearchSystem:
     def __init__(self):
-        print("⏳ Cargando InLegalBERT (Modelo específico legal)...")
-        # InLegalBERT es mucho mejor que BGE para leyes indias/británicas
-        try:
-            self.encoder = SentenceTransformer("law-ai/InLegalBERT") 
-            self.dim = 768
-        except:
-            print("⚠️ InLegalBERT falló, usando BGE-Base...")
-            self.encoder = SentenceTransformer("BAAI/bge-base-en-v1.5")
-            self.dim = 768
-            
+        print(f"⏳ Cargando Modelo Denso: {EMBEDDING_MODEL}...")
+        self.encoder = SentenceTransformer(EMBEDDING_MODEL) 
+        self.dim = 768
         self.client = MilvusClient(uri=MILVUS_URI)
-        self.bm25_cases = None
-        self.bm25_statutes = None
-        self.map_cases = {}
-        self.map_statutes = {}
 
-    def index_collection(self, documents, collection_name, is_statute=False):
+    def index_collection(self, documents, collection_name):
         if self.client.has_collection(collection_name):
             self.client.drop_collection(collection_name)
         
+        # 1. Definir el esquema de la colección
+        schema = self.client.create_schema(auto_id=True, enable_dynamic_field=True)
+        schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True)
+        schema.add_field(field_name="doc_name", datatype=DataType.VARCHAR, max_length=200)
+        schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=self.dim)
+        
+        # 2. Configurar los parámetros del índice HNSW
+        index_params = self.client.prepare_index_params()
+        index_params.add_index(
+            field_name="vector", 
+            index_type="HNSW", 
+            metric_type="COSINE", 
+            params={"M": 16, "efConstruction": 200}
+        )
+
+        # 3. Crear la colección aplicando el esquema y el índice
         self.client.create_collection(
             collection_name=collection_name,
-            dimension=self.dim,
-            metric_type="COSINE",
-            auto_id=True
+            schema=schema,
+            index_params=index_params
         )
 
         all_chunks = []
-        bm25_corpus = []
-        
-        for doc in tqdm(documents, desc=f"Indexando {collection_name}"):
-            chunks = TextProcessor.chunk_text(doc['text'])
+        for doc in tqdm(documents, desc=f"Procesando {collection_name}"):
+            clean_text = TextProcessor.super_clean(doc['text'])
+            chunks = TextProcessor.chunk_text(clean_text)
             for chunk in chunks:
                 all_chunks.append({"doc_name": doc['doc_name'], "text": chunk})
-                bm25_corpus.append(TextProcessor.clean(chunk).split())
 
-        # BM25
-        bm25_index = BM25Okapi(bm25_corpus)
-        current_map = {i: c['doc_name'] for i, c in enumerate(all_chunks)}
-        
-        if is_statute:
-            self.bm25_statutes = bm25_index
-            self.map_statutes = current_map
-        else:
-            self.bm25_cases = bm25_index
-            self.map_cases = current_map
-
-        # Milvus
         batch_size = 32
-        for i in tqdm(range(0, len(all_chunks), batch_size), desc="Vectores"):
+        for i in tqdm(range(0, len(all_chunks), batch_size), desc=f"Vectorizando {collection_name}"):
             batch = all_chunks[i : i + batch_size]
             texts = [x['text'] for x in batch]
             vectors = self.encoder.encode(texts, normalize_embeddings=True)
             
-            payload = []
-            for idx, vec in enumerate(vectors):
-                payload.append({
-                    "vector": vec,
-                    "doc_name": batch[idx]['doc_name'],
-                    "text_preview": batch[idx]['text'][:100]
-                })
+            payload = [{"vector": vec, "doc_name": batch[idx]['doc_name']} for idx, vec in enumerate(vectors)]
             self.client.insert(collection_name=collection_name, data=payload)
-
-    def reciprocal_rank_fusion(self, doc_ranks):
-        final_scores = {}
-        for doc_id, ranks in doc_ranks.items():
-            rrf_score = 0
-            for r in ranks:
-                rrf_score += 1 / (RRF_K + r)
-            final_scores[doc_id] = rrf_score
-        return sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
+            
+        # 4. Cargar la colección en memoria (Vital para poder buscar rápidamente después)
+        print(f"⏳ Cargando índice en memoria para {collection_name}...")
+        self.client.load_collection(collection_name)
+        
 
     def search(self, query_text):
-        # 1. ENRIQUECIMIENTO DE QUERY
-        # Detectamos leyes explícitas y las añadimos al principio para BM25
-        query_enriched = TextProcessor.extract_legal_keywords(query_text)
-        q_tokens = TextProcessor.clean(query_enriched).split()
+        # Limpieza de la consulta
+        q_clean = TextProcessor.super_clean(query_text)
+        q_vector = self.encoder.encode([q_clean], normalize_embeddings=True)
         
-        # Para vectores usamos la query original (semántica)
-        q_vector = self.encoder.encode([query_text], normalize_embeddings=True)
+        # Búsqueda en Casos
+        res_cases = self.client.search(
+            collection_name="aila_cases_v3", data=q_vector, limit=TOP_K_RETRIEVAL, output_fields=["doc_name"]
+        )
         
-        doc_ranks = {} 
-        def add_ranking(results_list):
-            for rank, doc_id in enumerate(results_list):
-                if doc_id not in doc_ranks: doc_ranks[doc_id] = []
-                doc_ranks[doc_id].append(rank + 1)
+        # Búsqueda en Estatutos
+        res_statutes = self.client.search(
+            collection_name="aila_statutes_v3", data=q_vector, limit=TOP_K_RETRIEVAL, output_fields=["doc_name"]
+        )
 
-        # A. CASOS
-        bm25_scores = self.bm25_cases.get_scores(q_tokens)
-        top_idx = np.argsort(bm25_scores)[::-1][:TOP_K_RETRIEVAL]
-        add_ranking([self.map_cases[i] for i in top_idx])
+        # Unir y ordenar por distancia Coseno (Mayor es mejor en Milvus COSINE)
+        combined_results = []
+        seen = set()
+        
+        # Función auxiliar para procesar hits y evitar duplicados (mismo documento, distinto chunk)
+        def process_hits(hits):
+            for hit in hits[0]:
+                doc_name = hit['entity']['doc_name']
+                score = hit['distance']
+                if doc_name not in seen:
+                    combined_results.append((doc_name, score))
+                    seen.add(doc_name)
 
-        milvus_res = self.client.search(collection_name="aila_cases", data=q_vector, limit=TOP_K_RETRIEVAL, output_fields=["doc_name"])
-        add_ranking([hit['entity']['doc_name'] for hit in milvus_res[0]])
+        process_hits(res_cases)
+        process_hits(res_statutes)
+        
+        # Ordenar globalmente por similitud semántica
+        combined_results.sort(key=lambda x: x[1], reverse=True)
+        return combined_results[:TOP_K_RETRIEVAL]
 
-        # B. ESTATUTOS
-        bm25_scores_s = self.bm25_statutes.get_scores(q_tokens)
-        top_s_idx = np.argsort(bm25_scores_s)[::-1][:TOP_K_RETRIEVAL]
-        add_ranking([self.map_statutes[i] for i in top_s_idx])
-
-        milvus_res_s = self.client.search(collection_name="aila_statutes", data=q_vector, limit=TOP_K_RETRIEVAL, output_fields=["doc_name"])
-        add_ranking([hit['entity']['doc_name'] for hit in milvus_res_s[0]])
-
-        # C. FUSIÓN
-        return self.reciprocal_rank_fusion(doc_ranks)[:10]
-
+# --- FUNCIONES DE EVALUACIÓN ---
 def load_docs(path, prefix):
     docs = []
-    files = glob.glob(os.path.join(path, f"{prefix}*.txt"))
-    for f in files:
+    for f in glob.glob(os.path.join(path, f"{prefix}*.txt")):
         name = os.path.splitext(os.path.basename(f))[0]
         with open(f, 'r', errors='ignore') as file:
             docs.append({"doc_name": name, "text": file.read()})
@@ -191,80 +165,27 @@ def load_queries(path):
                     p = line.strip().split("||")
                     queries.append({"id": p[0], "text": p[1]})
     return queries
-def load_qrels(filepaths):
-    """Carga y fusiona las respuestas correctas (Ground Truth) desde múltiples archivos."""
-    qrels = {}
-    for filepath in filepaths:
-        try:
-            with open(filepath, 'r') as f:
-                for line in f:
-                    parts = line.strip().split()
-                    if len(parts) >= 4:
-                        q_id, _, doc_id, rel = parts[0], parts[1], parts[2], int(parts[3])
-                        if rel > 0: # Solo si es relevante
-                            if q_id not in qrels:
-                                qrels[q_id] = set()
-                            qrels[q_id].add(doc_id)
-        except FileNotFoundError:
-            print(f"⚠️ Advertencia: No se encontró el archivo {filepath}")
-    return qrels
-
-def calculate_metrics(retrieved_docs, relevant_docs, k=50):
-    """Calcula Precision@K, Recall@K y Average Precision@K"""
-    retrieved_k = retrieved_docs[:k]
-    relevant_retrieved = [doc for doc in retrieved_k if doc in relevant_docs]
-    
-    # Precisión: De lo recuperado, ¿cuánto es útil?
-    precision = len(relevant_retrieved) / k if k > 0 else 0.0
-    
-    # Cobertura (Recall): De lo que existe útil, ¿cuánto recuperé?
-    recall = len(relevant_retrieved) / len(relevant_docs) if relevant_docs else 0.0
-    
-    # Average Precision (AP): Premia que los relevantes estén al principio
-    ap = 0.0
-    hits = 0
-    for i, doc in enumerate(retrieved_k):
-        if doc in relevant_docs:
-            hits += 1
-            ap += hits / (i + 1)
-            
-    ap = ap / len(relevant_docs) if relevant_docs else 0.0
-    
-    return precision, recall, ap
 
 def load_qrels(filepaths):
     qrels = {}
     for filepath in filepaths:
-        if not os.path.exists(filepath):
-            continue
+        if not os.path.exists(filepath): continue
         with open(filepath) as f:
             for line in f:
                 parts = line.strip().split()
-                if len(parts) >= 4:
-                    qid, _, docid, rel = parts[0], parts[1], parts[2], int(parts[3])
-                    if rel > 0:
-                        qrels.setdefault(qid, set()).add(docid)
+                if len(parts) >= 4 and int(parts[3]) > 0:
+                    qrels.setdefault(parts[0], set()).add(parts[2])
     return qrels
-
-def load_trec_rankings(filepath):
-    rankings = {}
-    with open(filepath) as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 6:
-                qid, _, docid, rank, score, _ = parts
-                rankings.setdefault(qid, []).append(docid)
-    return rankings
 
 def precision_at_k(retrieved, relevant, k):
     retrieved_k = retrieved[:k]
-    relevant_retrieved = [doc for doc in retrieved_k if doc in relevant]
-    return len(relevant_retrieved) / k if k else 0.0
+    hits = [doc for doc in retrieved_k if doc in relevant]
+    return len(hits) / k if k else 0.0
 
 def recall_at_k(retrieved, relevant, k):
     retrieved_k = retrieved[:k]
-    relevant_retrieved = [doc for doc in retrieved_k if doc in relevant]
-    return len(relevant_retrieved) / len(relevant) if relevant else 0.0
+    hits = [doc for doc in retrieved_k if doc in relevant]
+    return len(hits) / len(relevant) if relevant else 0.0
 
 def average_precision(retrieved, relevant, k):
     retrieved_k = retrieved[:k]
@@ -277,31 +198,56 @@ def average_precision(retrieved, relevant, k):
     return sum_precisions / len(relevant) if relevant else 0.0
 
 def main():
+    print("🚀 Iniciando Sistema de Recuperación Puramente Denso...")
+    
+    # 1. Cargar Datos
+    cases = load_docs(PATH_CASES, "C")
+    statutes = load_docs(PATH_STATUTES, "S")
+    queries = load_queries(PATH_QUERIES)
+    
+    # 2. Indexación (Solo Vectores)
+    system = DenseSearchSystem()
+    if cases: system.index_collection(cases, "aila_cases_v3")
+    if statutes: system.index_collection(statutes, "aila_statutes_v3")
+    
+    # 3. Búsqueda y Generación de Archivo TREC
+    print(f"\n🔍 Procesando {len(queries)} consultas...")
+    rankings_dict = {}
+    
+    with open(TREC_FILE, "w") as f:
+        for q in tqdm(queries, desc="Buscando"):
+            results = system.search(q['text'])
+            rankings_dict[q['id']] = [doc_id for doc_id, score in results]
+            
+            for rank, (doc_id, score) in enumerate(results):
+                f.write(f"{q['id']} Q0 {doc_id} {rank+1} {score:.4f} Dense_InLegalBERT\n")
+                
+    print(f"✅ Resultados guardados en {TREC_FILE}")
+    
+    # 4. Evaluación Automática
+    print("\n📊 Calculando Métricas de Evaluación...")
     qrels = load_qrels(QRELS_FILES)
-    rankings = load_trec_rankings(TREC_FILE)
     total_p, total_r, total_ap, n = 0, 0, 0, 0
 
     with open(OUTPUT_METRICS, "w") as fout:
-        for qid, retrieved in rankings.items():
+        for qid, retrieved in rankings_dict.items():
             relevant = qrels.get(qid, set())
-            p = precision_at_k(retrieved, relevant, K_METRICS)
-            r = recall_at_k(retrieved, relevant, K_METRICS)
-            ap = average_precision(retrieved, relevant, K_METRICS)
             if relevant:
+                p = precision_at_k(retrieved, relevant, K_METRICS)
+                r = recall_at_k(retrieved, relevant, K_METRICS)
+                ap = average_precision(retrieved, relevant, K_METRICS)
+                
                 n += 1
                 total_p += p
                 total_r += r
                 total_ap += ap
-                fout.write(f"QUERY: {qid:<10} | Precision@{K_METRICS}: {p:.4f} | Recall@{K_METRICS}: {r:.4f} | AP@{K_METRICS}: {ap:.4f}\n")
-            else:
-                fout.write(f"QUERY: {qid:<10} | [Sin evaluación - Falta en Ground Truth]\n")
+                fout.write(f"QUERY: {qid:<10} | P@{K_METRICS}: {p:.4f} | R@{K_METRICS}: {r:.4f} | MAP@{K_METRICS}: {ap:.4f}\n")
+        
         if n > 0:
-            mean_p = total_p / n
-            mean_r = total_r / n
-            mean_ap = total_ap / n
+            mean_p, mean_r, mean_ap = total_p / n, total_r / n, total_ap / n
             report = (
                 f"\n{'='*50}\n"
-                f"📊 REPORTE DE EVALUACIÓN GLOBAL\n"
+                f"📊 REPORTE DE EVALUACIÓN GLOBAL (Solo Vectores Densos)\n"
                 f"{'='*50}\n"
                 f"Consultas evaluadas : {n}\n"
                 f"Evaluado en Top-K   : {K_METRICS}\n"

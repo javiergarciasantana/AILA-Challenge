@@ -119,35 +119,34 @@ def cs_proc(option, path):
 
 
 def q_proc():
-  queries = load_queries("./archive/Query_doc.txt")
-  test_queries = {
-    "AILA_Q2": queries["AILA_Q2"],
-    "AILA_Q5": queries["AILA_Q5"],
-    "AILA_Q22": queries["AILA_Q22"],
-  }
+  queries = load_queries("../archive/Query_doc.txt")
+
   # We are omitting the chunking since the queries are at around 1000 char long
 
   selected_models = ['BAAI/bge-base-en-v1.5', 'BAAI/bge-small-en']
   def embed_text(texts):
-    return model.encode(texts, 
-    batch_size=64, 
-    show_progress_bar=True, 
-    convert_to_numpy=True,
-    normalize_embeddings=True if model_name.startswith('BAAI') else False
+    return model.encode (
+      texts, 
+      batch_size=64, 
+      show_progress_bar=True, 
+      convert_to_numpy=True,
+      normalize_embeddings=True if model_name.startswith('BAAI') else False
   )
   
   for model_name in selected_models:
     model = SentenceTransformer(model_name)
   
     # Prepare texts and IDs
-    texts = list(test_queries.values())
+    texts = list(queries.values())
 
     if model_name.startswith('BAAI'):
       instruction = f"Represent this sentence for searching relevant passages: "
       texts = [instruction + t for t in texts]
 
-    ids = list(test_queries.keys())
+    ids = list(queries.keys())
     embeddings = embed_text(texts)
+
+    print("Embedding list size", len(embeddings))
 
     print("Saving the" + model_name + "embeddings into .tsv files...\n")
     save_embeddings_q(embeddings, texts,ids, all_underscores(model_name))
@@ -159,7 +158,7 @@ def preprocessing_menu():
     options = [
         ('Case Documents', lambda: cs_proc("casedoc", "./archive/Object_casedocs")),
         ('Statutes', lambda: cs_proc("statute", "./archive/Object_statutes")),
-        ('3 Test Queries for all models', q_proc),
+        ('Queries for all models', q_proc),
         ('Back', None)
     ]
     

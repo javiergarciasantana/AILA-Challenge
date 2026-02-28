@@ -35,9 +35,6 @@ BASE_DIR = "/Users/javiersantana/INF_2024_2025/Trabajo Fin de Grado/AILA-Challen
 PATH_CASES = os.path.join(BASE_DIR, "Object_casedocs")
 PATH_STATUTES = os.path.join(BASE_DIR, "Object_statutes")
 PATH_QUERIES = os.path.join(BASE_DIR, "Query_doc.txt")
-TREC_OUTPUT_FILE = "test_results/v7/trec_rankings.txt"    # El formato crudo para Kaggle
-METRICS_OUTPUT_FILE = "test_results/v7/eval_metrics.txt"  # Tu reporte legible de métricas
-RAG_OUTPUT_FILE = "test_results/v7/rag_final_answers.txt"  # New file for LLM answers
 MILVUS_URI = "http://localhost:19530"
 OLLAMA_BASE_URL = "http://localhost:11434/v1" 
 OLLAMA_MODEL = "llama3"
@@ -54,9 +51,14 @@ FINAL_K = 30
 TOP_N_GEN = 3 # Number of docs to pass to LLM for final answer
 
 # METRICS
+K_METRICS = 60
 PATH_QRELS_STATUTES = os.path.join(BASE_DIR, "relevance_judgments_statutes.txt")
 PATH_QRELS_CASES = os.path.join(BASE_DIR, "relevance_judgments_priorcases.txt")
-K_METRICS = 50
+
+TREC_OUTPUT_FILE = "test_results/v7/trec_rankings.txt"    # El formato crudo para Kaggle
+METRICS_OUTPUT_FILE = "test_results/v7/eval_metrics.txt"  # Tu reporte legible de métricas
+RAG_OUTPUT_FILE = "test_results/v7/rag_final_answers.txt"  # New file for LLM answers
+
 
 class AgenticLayer:
   """Handles the 'Thinking' part using Ollama"""
@@ -357,7 +359,7 @@ def load_qrels(filepaths):
             print(f"⚠️ Advertencia: No se encontró el archivo {filepath}")
     return qrels
 
-def calculate_metrics(retrieved_docs, relevant_docs, k=50):
+def calculate_metrics(retrieved_docs, relevant_docs, k=K_METRICS):
     """Calcula Precision@K, Recall@K y Average Precision@K"""
     retrieved_k = retrieved_docs[:k]
     relevant_retrieved = [doc for doc in retrieved_k if doc in relevant_docs]

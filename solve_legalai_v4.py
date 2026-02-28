@@ -42,6 +42,13 @@ EMBEDDING_MODEL = "./models/InLegalBERT-AILA-Tuned"
 # Using the Larger (L-12) Cross Encoder for better accuracy
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-12-v2"
 
+# METRICS
+PATH_QRELS_STATUTES = os.path.join(BASE_DIR, "relevance_judgments_statutes.txt")
+PATH_QRELS_CASES = os.path.join(BASE_DIR, "relevance_judgments_priorcases.txt")
+K_METRICS = 60
+TREC_OUTPUT_FILE = "test_results/v4/trec_rankings.txt"    # El formato crudo para Kaggle
+METRICS_OUTPUT_FILE = "test_results/v4/eval_metrics.txt"  # Tu reporte legible de métricas
+
 # HYPERPARAMETERS
 CHUNK_SIZE = 512
 OVERLAP = 128
@@ -243,10 +250,54 @@ def load_queries(path):
                 queries.append({"id": p[0], "text": p[1]})
     return queries
 
+def load_qrels(filepaths):
+    """Carga y fusiona las respuestas correctas (Ground Truth) desde múltiples archivos."""
+    qrels = {}
+    for filepath in filepaths:
+        try:
+            with open(filepath, 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        q_id, _, doc_id, rel = parts[0], parts[1], parts[2], int(parts[3])
+                        if rel > 0: # Solo si es relevante
+                            if q_id not in qrels:
+                                qrels[q_id] = set()
+                            qrels[q_id].add(doc_id)
+        except FileNotFoundError:
+            print(f"⚠️ Advertencia: No se encontró el archivo {filepath}")
+    return qrels
+
+def calculate_metrics(retrieved_docs, relevant_docs, k=K_METRICS):
+    """Calcula Precision@K, Recall@K y Average Precision@K"""
+    retrieved_k = retrieved_docs[:k]
+    relevant_retrieved = [doc for doc in retrieved_k if doc in relevant_docs]
+    
+    # Precisión: De lo recuperado, ¿cuánto es útil?
+    precision = len(relevant_retrieved) / k if k > 0 else 0.0
+    
+    # Cobertura (Recall): De lo que existe útil, ¿cuánto recuperé?
+    recall = len(relevant_retrieved) / len(relevant_docs) if relevant_docs else 0.0
+    
+    # Average Precision (AP): Premia que los relevantes estén al principio
+    ap = 0.0
+    hits = 0
+    for i, doc in enumerate(retrieved_k):
+        if doc in relevant_docs:
+            hits += 1
+            ap += hits / (i + 1)
+            
+    ap = ap / len(relevant_docs) if relevant_docs else 0.0
+    
+    return precision, recall, ap
+
+
 def main():
     cases = load_data(PATH_CASES, "C")
     statutes = load_data(PATH_STATUTES, "S")
     queries = load_queries(PATH_QUERIES)
+    
+    qrels = load_qrels([PATH_QRELS_STATUTES, PATH_QRELS_CASES])
 
     if not cases: return
 
@@ -254,15 +305,72 @@ def main():
     system.index_collection(cases, "aila_cases_v4", is_statute=False)
     system.index_collection(statutes, "aila_statutes_v4", is_statute=True)
 
-    print(f"\n🚀 Running Balanced Search for {len(queries)} queries...")
-    
-    with open(OUTPUT_FILE, "w") as f:
-        for q in queries:
-            results = system.search_balanced(q['id'], q['text'])
-            for rank, (doc_id, score) in enumerate(results):
-                f.write(f"{q['id']} Q0 {doc_id} {rank+1} {score:.4f} Balanced_Rerank\n")
+    with open(TREC_OUTPUT_FILE, "w") as f: f.write("")
+    with open(METRICS_OUTPUT_FILE, "w") as f: f.write("")
 
-    print(f"\n✅ Done. Saved to {OUTPUT_FILE}")
+    print(f"\n🚀 Running Agentic RAG on {len(queries)} queries...")
+    
+    # 5. Variables para promedios
+    total_precision = 0.0
+    total_recall = 0.0
+    total_ap = 0.0
+    queries_evaluated = 0
+
+    for q in tqdm(queries):
+        q_id = q['id']
+        original_query = q['text']
+
+
+        # B. Retrieval
+        final = system.search_balanced(q["id"], q["text"])
+
+        # --- ARCHIVO 1: Formato Oficial TREC ---
+        with open(TREC_OUTPUT_FILE, "a") as f:
+            for rank, (doc_id, score) in enumerate(final):
+                f.write(f"{q_id} Q0 {doc_id} {rank+1} {score:.4f} AgenticHybrid\n")
+
+        # --- ARCHIVO 2: Cálculo y guardado de Métricas ---
+        retrieved_doc_ids = [doc[0] for doc in final]
+
+        if q_id in qrels:
+            p, r, ap = calculate_metrics(retrieved_doc_ids, qrels[q_id], k=K_METRICS)
+            total_precision += p
+            total_recall += r
+            total_ap += ap
+            queries_evaluated += 1
+
+            with open(METRICS_OUTPUT_FILE, "a") as f:
+                f.write(f"QUERY: {q_id:<10} | Precision@{K_METRICS}: {p:.4f} | Recall@{K_METRICS}: {r:.4f} | AP@{K_METRICS}: {ap:.4f}\n")
+        else:
+            with open(METRICS_OUTPUT_FILE, "a") as f:
+                f.write(f"QUERY: {q_id:<10} | [Sin evaluación - Falta en Ground Truth]\n")
+
+    # 6. Guardar e imprimir reporte estandarizado al final
+    if queries_evaluated > 0:
+      mean_precision = total_precision / queries_evaluated
+      mean_recall = total_recall / queries_evaluated
+      map_score = total_ap / queries_evaluated
+
+      report = (
+          f"\n{'='*50}\n"
+          f"📊 REPORTE DE EVALUACIÓN GLOBAL (Casos + Estatutos)\n"
+          f"{'='*50}\n"
+          f"Consultas evaluadas : {queries_evaluated}\n"
+          f"Evaluado en Top-K   : {K_METRICS}\n"
+          f"{'-' * 50}\n"
+          f"Precision@{K_METRICS}      : {mean_precision:.4f}  (Calidad media)\n"
+          f"Recall@{K_METRICS}         : {mean_recall:.4f}  (Cobertura media)\n"
+          f"MAP (Mean Avg Prec) : {map_score:.4f}  (Ordenamiento medio)\n"
+          f"{'='*50}\n"
+      )
+
+      print(report)
+      with open(METRICS_OUTPUT_FILE, "a") as f:
+          f.write(report)
+
+    print(f"✅ Formato TREC guardado en: {TREC_OUTPUT_FILE}")
+    print(f"✅ Métricas guardadas en:    {METRICS_OUTPUT_FILE}")
 
 if __name__ == "__main__":
+    import glob
     main()

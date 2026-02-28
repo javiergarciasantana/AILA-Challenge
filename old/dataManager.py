@@ -78,7 +78,7 @@ class QueryStorer:
         Creates a collection and inserts test query data.
         This can be expanded to handle different query types by adding more methods.
         """
-        collection_name = f"test_queries_{self.model_name}"
+        collection_name = f"queries_{self.model_name}"
         if utility.has_collection(collection_name):
             print(f"Collection '{collection_name}' already exists. Skipping.")
             return

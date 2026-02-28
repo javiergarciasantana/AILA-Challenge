@@ -1,6 +1,5 @@
 import os
 import time
-import re
 from datetime import datetime
 from pathlib import Path
 
@@ -14,28 +13,61 @@ from auxfunctions import (
     rerank_with_cross_encoder
 )
 
+# --- Add these imports for metrics ---
+from tqdm import tqdm
+
+# --- Add your metrics helpers here or import them ---
+def load_qrels(filepaths):
+    """Carga y fusiona las respuestas correctas (Ground Truth) desde múltiples archivos."""
+    qrels = {}
+    for filepath in filepaths:
+        try:
+            with open(filepath, 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        q_id, _, doc_id, rel = parts[0], parts[1], parts[2], int(parts[3])
+                        if rel > 0: # Solo si es relevante
+                            if q_id not in qrels:
+                                qrels[q_id] = set()
+                            qrels[q_id].add(doc_id)
+        except FileNotFoundError:
+            print(f"⚠️ Advertencia: No se encontró el archivo {filepath}")
+    return qrels
+
+def calculate_metrics(retrieved_docs, relevant_docs, k):
+    """Calcula Precision@K, Recall@K y Average Precision@K"""
+    retrieved_k = retrieved_docs[:k]
+    relevant_retrieved = [doc for doc in retrieved_k if doc in relevant_docs]
+    precision = len(relevant_retrieved) / k if k > 0 else 0.0
+    recall = len(relevant_retrieved) / len(relevant_docs) if relevant_docs else 0.0
+    ap = 0.0
+    hits = 0
+    for i, doc in enumerate(retrieved_k):
+        if doc in relevant_docs:
+            hits += 1
+            ap += hits / (i + 1)
+    ap = ap / len(relevant_docs) if relevant_docs else 0.0
+    return precision, recall, ap
+
+# --- Output file paths and params ---
+TREC_OUTPUT_FILE = "../test_results/v2/trec_rankings.txt"
+METRICS_OUTPUT_FILE = "../test_results/v2/eval_metrics.txt"
+K_METRICS = 60  # Set this to FINAL_K_CASES + FINAL_K_STATUTES or as needed
+PATH_QRELS_STATUTES = "../archive/relevance_judgments_statutes.txt"
+PATH_QRELS_CASES = "../archive/relevance_judgments_priorcases.txt"
+
 class TestRunner:
     """A class to encapsulate Milvus similarity testing logic."""
 
     def __init__(self, models):
-        """
-        Initializes the TestRunner.
-        Args:
-            models (list): A list of model names to run tests against.
-        """
         self.models = models
 
     def csv_print(self, model, results_df, filename, query_id=''):
-        """
-        Appends the similarity results to a CSV file with the model name as a header.
-        """
         file_path = f"tests/{filename}.csv"
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
         mode = 'a'
         header = True
-        # If file exists, we might not need header, but your logic writes it every time with a separator.
-        
         try:
             with open(file_path, mode, newline='', encoding='utf-8') as f:
                 f.write(f"=== {query_id} ({model}) ===\n")
@@ -44,12 +76,10 @@ class TestRunner:
             print(f"Error writing to CSV: {e}")
 
     def xlsx_print(self, all_rows_statute, all_rows_casedoc):
-        """Export results to Excel with proper sheets."""
         out_dir = Path("tests")
         out_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         xlsx_path = out_dir / f"complex_similarity_results_{ts}.xlsx"
-
         with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
             if all_rows_statute:
                 pd.DataFrame(all_rows_statute).to_excel(writer, sheet_name="Statutes", index=False)
@@ -57,22 +87,16 @@ class TestRunner:
                 pd.DataFrame(all_rows_casedoc).to_excel(writer, sheet_name="CaseDocs", index=False)
 
     def run_simple_similarity(self):
-        """
-        Performs a simple similarity test for each model.
-        """
         print("Running Simple Similarity Test...")
         for model in self.models:
             collection_name = f"casedoc_{model}"
             if not utility.has_collection(collection_name):
                 print(f"Collection {collection_name} not found. Skipping.")
                 continue
-
             _, embeddings = load_embeddings(model, "casedoc")
             collection = Collection(collection_name)
             collection.load()
-
-            query_vector = embeddings[0].tolist()  # The embedding of the first chunk
-
+            query_vector = embeddings[0].tolist()
             results = collection.search(
                 data=[query_vector],
                 anns_field="embedding",
@@ -80,192 +104,135 @@ class TestRunner:
                 limit=5,
                 output_fields=["id", "type", "chunk"]
             )
-
             results_data = [{"ID": hit.id, "Score": hit.distance} for hit in results[0]]
             results_df = pd.DataFrame(results_data)
-
             print(f"\n--- Results for {model} ---")
             print(results_df)
-
             self.csv_print(model, results_df, "simple_similarity_results")
             collection.release()
-
         print("\nResults saved to tests/simple_similarity_results.csv")
         time.sleep(3)
 
     def run_complex_similarity(self):
         """
-        Performs a complex similarity test with deduplication and reranking.
+        Performs a complex similarity test and exports TREC and metrics files.
         """
         print("Running Complex Similarity Test...")
-        all_rows_statute = []
-        all_rows_casedoc = []
 
-        for model_name in self.models:
-            queries_col_name = f"test_queries_{model_name}"
-            statute_col_name = f"statute_{model_name}"
-            casedoc_col_name = f"casedoc_{model_name}"
+        # --- Load ground truth for metrics ---
+        qrels = load_qrels([PATH_QRELS_STATUTES, PATH_QRELS_CASES])
 
-            # Check existence of all required collections
-            if not all(utility.has_collection(name) for name in [queries_col_name, statute_col_name, casedoc_col_name]):
-                print(f"Required collections for model '{model_name}' not found. Skipping.")
-                continue
+        # --- Prepare output files ---
+        os.makedirs(os.path.dirname(TREC_OUTPUT_FILE), exist_ok=True)
+        with open(TREC_OUTPUT_FILE, "w") as f: f.write("")
+        with open(METRICS_OUTPUT_FILE, "w") as f: f.write("")
 
-            # Load collections
-            queries_collection = Collection(queries_col_name)
-            statute_collection = Collection(statute_col_name)
-            casedoc_collection = Collection(casedoc_col_name)
-            
-            queries_collection.load()
-            statute_collection.load()
-            casedoc_collection.load()
+        # --- For metrics aggregation ---
+        total_precision = 0.0
+        total_recall = 0.0
+        total_ap = 0.0
+        queries_evaluated = 0
 
-            metric = "COSINE" if model_name.startswith('bge') else "L2"
-            search_params = {
-                "metric_type": metric,
-                "offset": 0,
-                "ignore_growing": False,
-                "params": {"nprobe": 10}
-            }
+        # --- Iterate over models and queries ---
+        # for model_name in self.models:
+        queries_col_name = f"queries_bge_small_en"
+        statute_col_name = f"statute_bge_small_en"
+        casedoc_col_name = f"casedoc_bge_small_en"
 
-            # Fetch all queries
-            query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding", "text"])
+        # if not all(utility.has_collection(name) for name in [queries_col_name, statute_col_name, casedoc_col_name]):
+        #     print(f"Required collections for model '{model_name}' not found. Skipping.")
+        #     continue
 
-            for q in query_results:
-                # --- 1. Statute Retrieval ---
-                results_s = statute_collection.search(
-                    data=[q["embedding"]],
-                    anns_field="embedding",
-                    param=search_params,
-                    limit=20,
-                    output_fields=["id", "chunk", "text"]
-                )
-                
-                # Pre-fetch expected counts to avoid repeated calls in loop
-                statute_expected_count = count_expected("statute", q["id"])
-                casedoc_expected_count = count_expected("casedoc", q["id"])
-                
-                statute_hits = 0
-                rows_s = []
-                
-                for i, hit in enumerate(results_s[0]):
-                    is_hit = is_expected("statute", q["id"], hit.id)
-                    if is_hit:
-                        statute_hits += 1
-                    
-                    flag = "✧" if is_hit else ""
-                    row = {
-                        "query_id": q["id"],
-                        "model": model_name,
-                        "target": "statute",
-                        "rank": i + 1,
-                        "id": str(hit.id) + flag,
-                        "chunk": hit.entity.get("chunk"),
-                        "text": hit.entity.get("text")[38:] if hit.entity.get("text") else None,
-                        "score": float(hit.distance),
-                    }
-                    rows_s.append(row)
+        queries_collection = Collection(queries_col_name)
+        statute_collection = Collection(statute_col_name)
+        casedoc_collection = Collection(casedoc_col_name)
+        queries_collection.load()
+        statute_collection.load()
+        casedoc_collection.load()
 
-                # --- 2. CaseDoc Retrieval (High Recall Phase) ---
-                # Search limit increased to 2000 to overcome chunk saturation
-                results_c = casedoc_collection.search(
-                    data=[q["embedding"]],
-                    anns_field="embedding",
-                    param=search_params,
-                    limit=2000, 
-                    output_fields=["id", "chunk", "text"]
-                )
+        # metric = "COSINE" if model_name.startswith('bge') else "L2"
+        search_params = {
+            "metric_type": "COSINE",
+            "offset": 0,
+            "ignore_growing": False,
+            "params": {"nprobe": 10}
+        }
 
-                casedoc_hits = 0
-                rows_c_raw = []
-                
-                for i, hit in enumerate(results_c[0]):
-                    is_hit = is_expected("casedoc", q["id"], hit.id)
-                    if is_hit:
-                        casedoc_hits += 1
-                    
-                    flag = "✧" if is_hit else ""
-                    row = {
-                        "query_id": q["id"],
-                        "model": model_name,
-                        "target": "casedoc",
-                        "rank": i + 1,
-                        "id": str(hit.id) + flag,
-                        "chunk": hit.entity.get("chunk"),
-                        "text": hit.entity.get("text")[35:] if hit.entity.get("text") else None,
-                        "score": float(hit.distance),
-                    }
-                    rows_c_raw.append(row)
+        query_results = queries_collection.query(expr="id != ''", output_fields=["id", "embedding", "text"])
 
-                # Calculate Precision (on retrieval set)
-                statute_precision = statute_hits / statute_expected_count if statute_expected_count > 0 else 0
-                casedoc_precision = casedoc_hits / casedoc_expected_count if casedoc_expected_count > 0 else 0
+        for q in tqdm(query_results, desc=f"Model bge_small_en"):
+            q_id = q["id"]
+            q_text = q["text"]
 
-                # --- 3. Deduplication Logic ---
-                unique_cases = {}
-                for row in rows_c_raw:
-                    # Assumes ID format is "C123" or "C123✧". 
-                    # If using flags, ensure splitting or keying handles them consistently.
-                    case_id = row['id'].split()[0] 
-                    
-                    # Keep first occurrence (Milvus returns sorted by score, so first is best)
-                    if case_id not in unique_cases:
-                        unique_cases[case_id] = row
-                
-                # Slice Top 100 Unique Candidates
-                distinct_candidates = list(unique_cases.values())[:100]
+            # --- Statute Retrieval ---
+            results_s = statute_collection.search(
+                data=[q["embedding"]],
+                anns_field="embedding",
+                param=search_params,
+                limit=K_METRICS // 2,
+                output_fields=["id", "chunk", "text"]
+            )
+            # --- CaseDoc Retrieval ---
+            results_c = casedoc_collection.search(
+                data=[q["embedding"]],
+                anns_field="embedding",
+                param=search_params,
+                limit=K_METRICS // 2,
+                output_fields=["id", "chunk", "text"]
+            )
 
-                # --- 4. Reranking ---
-                # Truncate query to 1000 chars to fit CrossEncoder context
-                truncated_query = q["text"][:1000]
-                rows_s_reranked = rerank_with_cross_encoder(truncated_query, rows_s)
-                rows_c_reranked = rerank_with_cross_encoder(truncated_query, distinct_candidates)
+            # --- Merge and rerank (if needed) ---
+            final = []
+            for i, hit in enumerate(results_c[0]):
+                final.append((str(hit.id), float(hit.distance)))
+            for i, hit in enumerate(results_s[0]):
+                final.append((str(hit.id), float(hit.distance)))
+            final.sort(key=lambda x: x[1], reverse=True)  # or by score, depending on your logic
 
-                # --- 5. Formatting for Output ---
-                def limit_text(row):
-                    txt = row.get("text", "")
-                    return (txt[:20] + "...") if txt and len(txt) > 20 else txt
+            # --- Write TREC output ---
+            with open(TREC_OUTPUT_FILE, "a") as f:
+                for rank, (doc_id, score) in enumerate(final):
+                    f.write(f"{q_id} Q0 {doc_id} {rank+1} {score:.4f} AgenticHybrid\n")
 
-                rows_s_display = [{**row, "text": limit_text(row)} for row in rows_s_reranked]
-                rows_c_display = [{**row, "text": limit_text(row)} for row in rows_c_reranked]
+            # --- Metrics ---
+            retrieved_doc_ids = [doc[0] for doc in final]
+            if q_id in qrels:
+                p, r, ap = calculate_metrics(retrieved_doc_ids, qrels[q_id], k=K_METRICS)
+                total_precision += p
+                total_recall += r
+                total_ap += ap
+                queries_evaluated += 1
+                with open(METRICS_OUTPUT_FILE, "a") as f:
+                    f.write(f"QUERY: {q_id:<10} | Precision@{K_METRICS}: {p:.4f} | Recall@{K_METRICS}: {r:.4f} | AP@{K_METRICS}: {ap:.4f}\n")
+            else:
+                with open(METRICS_OUTPUT_FILE, "a") as f:
+                    f.write(f"QUERY: {q_id:<10} | [Sin evaluación - Falta en Ground Truth]\n")
 
-                if rows_s_display:
-                    header = {"query_id": f"--- Query: {q['id']}, Precision: {statute_precision:.2f} (Model: {model_name}) ---"}
-                    all_rows_statute.append(header)
-                    all_rows_statute.extend(rows_s_display)
-                    all_rows_statute.append({}) 
+        queries_collection.release()
+        statute_collection.release()
+        casedoc_collection.release()
 
-                if rows_c_display:
-                    header = {"query_id": f"--- Query: {q['id']}, Precision: {casedoc_precision:.2f} (Model: {model_name}) ---"}
-                    all_rows_casedoc.append(header)
-                    all_rows_casedoc.extend(rows_c_display)
-                    all_rows_casedoc.append({})
+        # --- Global report ---
+        if queries_evaluated > 0:
+            mean_precision = total_precision / queries_evaluated
+            mean_recall = total_recall / queries_evaluated
+            map_score = total_ap / queries_evaluated
+            report = (
+                f"\n{'='*50}\n"
+                f"📊 REPORTE DE EVALUACIÓN GLOBAL (Casos + Estatutos)\n"
+                f"{'='*50}\n"
+                f"Consultas evaluadas : {queries_evaluated}\n"
+                f"Evaluado en Top-K   : {K_METRICS}\n"
+                f"{'-' * 50}\n"
+                f"Precision@{K_METRICS}      : {mean_precision:.4f}  (Calidad media)\n"
+                f"Recall@{K_METRICS}         : {mean_recall:.4f}  (Cobertura media)\n"
+                f"MAP (Mean Avg Prec) : {map_score:.4f}  (Ordenamiento medio)\n"
+                f"{'='*50}\n"
+            )
+            print(report)
+            with open(METRICS_OUTPUT_FILE, "a") as f:
+                f.write(report)
 
-                # --- Console Output ---
-                relevant_ids = set()
-                try:
-                    with open("./archive/relevance_judgments_priorcases.txt") as f:
-                        for line in f:
-                            parts = line.strip().split()
-                            if len(parts) == 4 and parts[0] == q["id"] and parts[3] == "1":
-                                relevant_ids.add(parts[2])
-                except FileNotFoundError:
-                    pass # Skip if file not found
-
-                print(f"\nQuery ID: {q['id']} (Model: {model_name}) - Statutes")
-                print(pd.DataFrame(rows_s_reranked)[["rank", "id", "chunk", "score"]])
-                
-                print(f"\nQuery ID: {q['id']} (Model: {model_name}) - CaseDocs (Top Unique Reranked)")
-                print(pd.DataFrame(rows_c_reranked)[["rank", "id", "chunk", "score"]])
-
-                print("Relevant casedoc IDs for", q["id"], ":", relevant_ids)
-                # Show top 10 reranked IDs for quick check
-                print("Top retrieved casedoc IDs:", [row["id"].split()[0] for row in rows_c_reranked[:10]])
-
-            queries_collection.release()
-            statute_collection.release()
-            casedoc_collection.release()
-
-        # Uncomment to save Excel at end of run
-        # self.xlsx_print(all_rows_statute, all_rows_casedoc)
+        print(f"✅ Formato TREC guardado en: {TREC_OUTPUT_FILE}")
+        print(f"✅ Métricas guardadas en:    {METRICS_OUTPUT_FILE}")
         time.sleep(1)

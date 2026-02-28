@@ -1,0 +1,61 @@
+QUERY: AILA_Q1    | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q2    | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q3    | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q4    | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q5    | Precision@30: 0.0667 | Recall@30: 0.2000 | AP@30: 0.0233
+QUERY: AILA_Q6    | Precision@30: 0.1000 | Recall@30: 0.3333 | AP@30: 0.0630
+QUERY: AILA_Q7    | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q8    | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q9    | Precision@30: 0.0667 | Recall@30: 0.2857 | AP@30: 0.0157
+QUERY: AILA_Q10   | Precision@30: 0.0667 | Recall@30: 0.2500 | AP@30: 0.0804
+QUERY: AILA_Q11   | Precision@30: 0.0333 | Recall@30: 0.1667 | AP@30: 0.0064
+QUERY: AILA_Q12   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q13   | Precision@30: 0.0333 | Recall@30: 0.1250 | AP@30: 0.0156
+QUERY: AILA_Q14   | Precision@30: 0.0333 | Recall@30: 0.1667 | AP@30: 0.0208
+QUERY: AILA_Q15   | Precision@30: 0.0333 | Recall@30: 0.2000 | AP@30: 0.0077
+QUERY: AILA_Q16   | Precision@30: 0.1000 | Recall@30: 0.4286 | AP@30: 0.0786
+QUERY: AILA_Q17   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q18   | Precision@30: 0.0333 | Recall@30: 0.2000 | AP@30: 0.0167
+QUERY: AILA_Q19   | Precision@30: 0.0333 | Recall@30: 0.1111 | AP@30: 0.0037
+QUERY: AILA_Q20   | Precision@30: 0.0667 | Recall@30: 0.3333 | AP@30: 0.1019
+QUERY: AILA_Q21   | Precision@30: 0.0333 | Recall@30: 0.1250 | AP@30: 0.0048
+QUERY: AILA_Q22   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q23   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q24   | Precision@30: 0.0667 | Recall@30: 0.3333 | AP@30: 0.0221
+QUERY: AILA_Q25   | Precision@30: 0.0333 | Recall@30: 0.0909 | AP@30: 0.0076
+QUERY: AILA_Q26   | Precision@30: 0.0667 | Recall@30: 0.1538 | AP@30: 0.1282
+QUERY: AILA_Q27   | Precision@30: 0.1000 | Recall@30: 0.3333 | AP@30: 0.1222
+QUERY: AILA_Q28   | Precision@30: 0.0667 | Recall@30: 0.3333 | AP@30: 0.0171
+QUERY: AILA_Q29   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q30   | Precision@30: 0.0667 | Recall@30: 0.1333 | AP@30: 0.0356
+QUERY: AILA_Q31   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q32   | Precision@30: 0.0667 | Recall@30: 0.2857 | AP@30: 0.0190
+QUERY: AILA_Q33   | Precision@30: 0.0333 | Recall@30: 0.2000 | AP@30: 0.0083
+QUERY: AILA_Q34   | Precision@30: 0.0667 | Recall@30: 0.1111 | AP@30: 0.0070
+QUERY: AILA_Q35   | Precision@30: 0.0667 | Recall@30: 0.2857 | AP@30: 0.0286
+QUERY: AILA_Q36   | Precision@30: 0.0667 | Recall@30: 0.1818 | AP@30: 0.0130
+QUERY: AILA_Q37   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q38   | Precision@30: 0.0333 | Recall@30: 0.1111 | AP@30: 0.0093
+QUERY: AILA_Q39   | Precision@30: 0.0333 | Recall@30: 0.0588 | AP@30: 0.0029
+QUERY: AILA_Q40   | Precision@30: 0.0333 | Recall@30: 0.1667 | AP@30: 0.0119
+QUERY: AILA_Q41   | Precision@30: 0.1333 | Recall@30: 0.4000 | AP@30: 0.0774
+QUERY: AILA_Q42   | Precision@30: 0.0333 | Recall@30: 0.1111 | AP@30: 0.0139
+QUERY: AILA_Q43   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q44   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q45   | Precision@30: 0.1000 | Recall@30: 0.5000 | AP@30: 0.0968
+QUERY: AILA_Q46   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q47   | Precision@30: 0.0667 | Recall@30: 0.3333 | AP@30: 0.0244
+QUERY: AILA_Q48   | Precision@30: 0.0333 | Recall@30: 0.1111 | AP@30: 0.0044
+QUERY: AILA_Q49   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+QUERY: AILA_Q50   | Precision@30: 0.0000 | Recall@30: 0.0000 | AP@30: 0.0000
+
+==================================================
+📊 REPORTE DE EVALUACIÓN GLOBAL (Casos + Estatutos)
+==================================================
+Consultas evaluadas : 50
+Evaluado en Top-K   : 30
+--------------------------------------------------
+Precision@30      : 0.0373  (Calidad media)
+Recall@30         : 0.1432  (Cobertura media)
+MAP (Mean Avg Prec) : 0.0218  (Ordenamiento medio)
+==================================================
