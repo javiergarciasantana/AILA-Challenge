@@ -51,11 +51,11 @@ def calculate_metrics(retrieved_docs, relevant_docs, k):
     return precision, recall, ap
 
 # --- Output file paths and params ---
-TREC_OUTPUT_FILE = "../test_results/v2/trec_rankings.txt"
-METRICS_OUTPUT_FILE = "../test_results/v2/eval_metrics.txt"
+TREC_OUTPUT_FILE = "./test_results/v2/trec_rankings.txt"
+METRICS_OUTPUT_FILE = "./test_results/v2/eval_metrics.txt"
 K_METRICS = 60  # Set this to FINAL_K_CASES + FINAL_K_STATUTES or as needed
-PATH_QRELS_STATUTES = "../archive/relevance_judgments_statutes.txt"
-PATH_QRELS_CASES = "../archive/relevance_judgments_priorcases.txt"
+PATH_QRELS_STATUTES = "./archive/relevance_judgments_statutes.txt"
+PATH_QRELS_CASES = "./archive/relevance_judgments_priorcases.txt"
 
 class TestRunner:
     """A class to encapsulate Milvus similarity testing logic."""

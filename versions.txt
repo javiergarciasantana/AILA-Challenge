@@ -1,0 +1,6 @@
+version 2.0(old): Test Search with only bge_small_en 
+version 3.0: Test Search with only InLegalBERT 
+version 6.0 Test Search with InLegalBERT and BM25EmbeddingFunction
+version 5.0 Test Search with BGE-M3
+version 6.0 Test Search with InLegalBERT and BM25EmbeddingFunction and agentic layer
+version 7.0 Test Search with InLegalBERT and BM25EmbeddingFunction and agentic layer(fixed)

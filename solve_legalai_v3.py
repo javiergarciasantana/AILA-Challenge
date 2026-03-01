@@ -14,9 +14,9 @@ PATH_STATUTES = os.path.join(BASE_DIR, "Object_statutes")
 PATH_QUERIES = os.path.join(BASE_DIR, "Query_doc.txt")
 
 # ARCHIVOS DE SALIDA Y EVALUACIÓN
-os.makedirs("test_results/v_dense", exist_ok=True)
-TREC_FILE = "test_results/v_dense/trec_rankings.txt"
-OUTPUT_METRICS = "test_results/v_dense/eval_metrics.txt"
+os.makedirs("test_results/v_3", exist_ok=True)
+TREC_FILE = "test_results/v_3/trec_rankings.txt"
+OUTPUT_METRICS = "test_results/v_3/eval_metrics.txt"
 QRELS_FILES = [
     os.path.join(BASE_DIR, "relevance_judgments_statutes.txt"),
     os.path.join(BASE_DIR, "relevance_judgments_priorcases.txt")
