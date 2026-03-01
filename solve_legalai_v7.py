@@ -22,6 +22,7 @@ import glob
 import re
 from tqdm import tqdm
 import numpy as np
+import unicodedata
 from openai import OpenAI  # For Ollama integration
 from pymilvus import MilvusClient, AnnSearchRequest, RRFRanker, DataType
 from sentence_transformers import SentenceTransformer, CrossEncoder
@@ -46,8 +47,11 @@ DENSE_MODEL_PATH = "./models/InLegalBERT-AILA-Tuned"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-12-v2"
 
 # PARAMS
+CHUNK_SIZE = 300
+OVERLAP = 50
 TOP_K = 100
 FINAL_K = 30
+
 TOP_N_GEN = 3 # Number of docs to pass to LLM for final answer
 
 # METRICS
@@ -55,10 +59,28 @@ K_METRICS = 60
 PATH_QRELS_STATUTES = os.path.join(BASE_DIR, "relevance_judgments_statutes.txt")
 PATH_QRELS_CASES = os.path.join(BASE_DIR, "relevance_judgments_priorcases.txt")
 
-TREC_OUTPUT_FILE = "test_results/v7/trec_rankings.txt"    # El formato crudo para Kaggle
-METRICS_OUTPUT_FILE = "test_results/v7/eval_metrics.txt"  # Tu reporte legible de métricas
-RAG_OUTPUT_FILE = "test_results/v7/rag_final_answers.txt"  # New file for LLM answers
+TREC_OUTPUT_FILE = "test_results/v7_no_rerank/trec_rankings.txt"    # El formato crudo para Kaggle
+METRICS_OUTPUT_FILE = "test_results/v7_no_rerank/eval_metrics.txt"  # Tu reporte legible de métricas
+RAG_OUTPUT_FILE = "test_results/v7_no_rerank/rag_final_answers.txt"  # New file for LLM answers
 
+class TextProcessor:
+    @staticmethod
+    def super_clean(text):
+        text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+        text = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
+        text = re.sub(r'[\r\n\t]+', ' ', text)
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
+    @staticmethod
+    def chunk_text(text):
+        words = text.split()
+        if not words: return []
+        chunks = []
+        for i in range(0, len(words), CHUNK_SIZE - OVERLAP):
+            chunk = " ".join(words[i:i + CHUNK_SIZE])
+            chunks.append(chunk)
+        return chunks
 
 class AgenticLayer:
   """Handles the 'Thinking' part using Ollama"""
@@ -182,35 +204,34 @@ class CustomHybridSearch:
     print(f"📂 Loading text for {collection_name}...")
     for d in docs: self.doc_store[d['doc_name']] = d['text']
     
-    # 2. Check Cache (like v5)
+    # 2. Check Cache
     if self.client.has_collection(collection_name):
       try:
         self.client.load_collection(collection_name)
         res = self.client.query(collection_name, filter="", limit=1)
         if res:
-          # We need to fit BM25 anyway to run queries later (it needs statistics)
-          # We reconstruct a temporary corpus for fitting if cached
           print(f"✅ Collection '{collection_name}' already exists. Re-fitting BM25 for query consistency...")
           temp_chunks = []
-          for d in docs[:500]: # Fit on subset to be fast, or full if needed
-              temp_chunks.extend(d['text'].split()[:512]) # Dummy chunks
-          # Ideally we fit on full corpus, but for speed here we assume user just runs it once properly.
-          # For correctness in this script, we will chunk again just for fitting BM25 if needed.
-          # BUT: Since self.bm25_ef needs to be fit, we usually do it.
-          # For this script, we will just proceed to chunking to ensure BM25 is fit correctly.
+          for d in docs[:500]: 
+              # Usamos la limpieza también para el caché rápido
+              clean_t = TextProcessor.super_clean(d['text'])
+              temp_chunks.extend(clean_t.split()[:512]) 
           pass 
       except:
         print(f"⚠️ Collection '{collection_name}' seems broken/empty. Re-indexing...")
         self.client.drop_collection(collection_name)
 
-    # 3. Prepare Chunks
+    # 3. Prepare Chunks (USANDO TEXTPROCESSOR)
     all_chunks = []
     doc_names = []
     
-    for doc in tqdm(docs, desc="Chunking"):
-      words = doc['text'].split()
-      for i in range(0, len(words), 400):
-        chunk = " ".join(words[i:i+512])
+    for doc in tqdm(docs, desc="Limpiando y Fragmentando"):
+      # A. Limpieza profunda
+      clean_text = TextProcessor.super_clean(doc['text'])
+      # B. Fragmentación segura (300 palabras)
+      chunks = TextProcessor.chunk_text(clean_text)
+      
+      for chunk in chunks:
         all_chunks.append(chunk)
         doc_names.append(doc['doc_name'])
 
@@ -247,8 +268,6 @@ class CustomHybridSearch:
         
         sparse_dict = {int(idx): float(val) for idx, val in zip(indices, data)}
         if not sparse_dict:
-          # If BM25 ignored all words (e.g. only stop words), add a dummy value.
-          # We use index 0 with a negligible weight.
           sparse_dict = {0: 0.00001}
         # -------------------------------------------
         
@@ -265,11 +284,16 @@ class CustomHybridSearch:
     self.client.load_collection(collection_name)
 
   def search(self, collection_name, dense_query_text, sparse_query_text):
-    # 1. Embed Query Dense
-    query_dense = self.dense_model.encode([dense_query_text], normalize_embeddings=True)[0]
+    # --- Limpiamos las consultas igual que los documentos ---
+    clean_dense_query = TextProcessor.super_clean(dense_query_text)
+    clean_sparse_query = TextProcessor.super_clean(sparse_query_text)
+
+    # 1. Embed Query Dense (Usando la consulta limpia)
+    query_dense = self.dense_model.encode([clean_dense_query], normalize_embeddings=True)[0]
     
-    # 2. Embed Query Sparse (BM25) with FIX
-    sparse_matrix = self.bm25_ef.encode_queries([sparse_query_text])
+    # 2. Embed Query Sparse (BM25) (Usando la consulta dispersa limpia con las keywords de Ollama)
+    sparse_matrix = self.bm25_ef.encode_queries([clean_sparse_query])
+    
     # Extract row 0 manually
     start = sparse_matrix.indptr[0]
     end = sparse_matrix.indptr[1]
@@ -295,7 +319,7 @@ class CustomHybridSearch:
     res = self.client.hybrid_search(
       collection_name, 
       reqs=[req_dense, req_sparse], 
-      ranker=RRFRanker(k=60), 
+      ranker=RRFRanker(k=30), 
       limit=TOP_K,
       output_fields=["doc_name"]
     )
@@ -398,8 +422,8 @@ def main():
   agent = AgenticLayer()  # Added agentic layer
   engine = CustomHybridSearch()
   
-  engine.process_and_index("aila_cases_v6", cases)
-  engine.process_and_index("aila_statutes_v6", statutes)
+  engine.process_and_index("aila_cases_v6_cleaned", cases)
+  engine.process_and_index("aila_statutes_v6_cleaned", statutes)
   
   # --- 3. Limpiar archivos de salida ---
   with open(TREC_OUTPUT_FILE, "w") as f: f.write("")
@@ -425,16 +449,21 @@ def main():
     sparse_query = f"{original_query} {legal_keywords}"
 
     # B. Retrieval
-    cands_c = engine.search("aila_cases_v6", dense_query_text=original_query, sparse_query_text=sparse_query)
-    cands_s = engine.search("aila_statutes_v6", dense_query_text=original_query, sparse_query_text=sparse_query)
+    cands_c = engine.search("aila_cases_v6_cleaned", dense_query_text=original_query, sparse_query_text=sparse_query)
+    cands_s = engine.search("aila_statutes_v6_cleaned", dense_query_text=original_query, sparse_query_text=sparse_query)
     
-    # C. Reranking
-    ranked_c = engine.rerank_sliding_window(original_query, cands_c, FINAL_K)
-    ranked_s = engine.rerank_sliding_window(original_query, cands_s, FINAL_K)
+    # Convert doc IDs to (doc_id, score) tuples with default scores
+    # Convert doc IDs to (doc_id, score) tuples, maintaining rank position as score
+    cands_c = [(doc_id, FINAL_K - i) for i, doc_id in enumerate(cands_c[:FINAL_K])]
+    cands_s = [(doc_id, FINAL_K - i) for i, doc_id in enumerate(cands_s[:FINAL_K])]
     
-    # D. Merge & Save Rankings
-    final = ranked_c + ranked_s
-    final.sort(key=lambda x: x[1], reverse=True)
+    # D. Merge & Save Rankings (maintaining order, but deduplicating)
+    seen = set()
+    final = []
+    for doc_id, score in cands_c + cands_s:
+      if doc_id not in seen:
+        final.append((doc_id, score))
+        seen.add(doc_id)
     
     # --- ARCHIVO 1: Formato Oficial TREC ---
     with open(TREC_OUTPUT_FILE, "a") as f:
@@ -458,17 +487,17 @@ def main():
         with open(METRICS_OUTPUT_FILE, "a") as f:
             f.write(f"QUERY: {q_id:<10} | [Sin evaluación - Falta en Ground Truth]\n")
 
-    # --- E. FINAL GENERATION STEP (NEW) ---
-    top_docs = []
-    for doc_id, score in final[:TOP_N_GEN]:
-        if doc_id in engine.doc_store:
-            top_docs.append({'id': doc_id, 'text': engine.doc_store[doc_id]})
+    # --- E. FINAL GENERATION STEP ---
+    # top_docs = []
+    # for doc_id, score in final[:TOP_N_GEN]:
+    #     if doc_id in engine.doc_store:
+    #         top_docs.append({'id': doc_id, 'text': engine.doc_store[doc_id]})
     
-    answer, sources = agent.generate_final_answer(q['text'], top_docs)
+    # answer, sources = agent.generate_final_answer(q['text'], top_docs)
     
-    output_str = f"QUERY: {q_id}\nBASED ON: {', '.join(sources)}\nANSWER:\n{answer}\n{'-'*50}\n\n"
-    with open(RAG_OUTPUT_FILE, "a") as f:
-        f.write(output_str)
+    # output_str = f"QUERY: {q_id}\nBASED ON: {', '.join(sources)}\nANSWER:\n{answer}\n{'-'*50}\n\n"
+    # with open(RAG_OUTPUT_FILE, "a") as f:
+    #     f.write(output_str)
 
   # --- 5. Guardar e imprimir reporte estandarizado al final ---
   if queries_evaluated > 0:

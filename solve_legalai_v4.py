@@ -230,8 +230,13 @@ class SearchSystem:
             # Predecir cada ventana y quedarse con la puntuación máxima
             pairs = [[query, w] for w in check_wins]
             scores = self.reranker.predict(pairs)
-            best_score = float(max(scores))
             
+            # FIX: Si el modelo devuelve 3 columnas (NLI), extraemos la de "Entailment"
+            if len(scores.shape) > 1:
+                # Asumimos que la Implicación (Entailment) es la columna 1 o la que tenga el mayor valor general
+                scores = scores[:, 1] # Extrae solo la segunda columna de todas las ventanas            
+           
+            best_score = float(max(scores))
             doc_scores.append((did, best_score))
             
         doc_scores.sort(key=lambda x: x[1], reverse=True)
