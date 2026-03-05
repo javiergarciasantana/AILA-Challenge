@@ -1,13 +1,3 @@
-==================================================
-📊 REPORTE DE EVALUACIÓN GLOBAL (Casos + Estatutos)
-==================================================
-Consultas evaluadas : 50
-Evaluado en Top-K   : 60
---------------------------------------------------
-Precision@60      : 0.0290  (Calidad media)
-Recall@60         : 0.2295  (Cobertura media)
-MAP (Mean Avg Prec) : 0.0376  (Ordenamiento medio)
-==================================================
 QUERY: AILA_Q1    | Precision@60: 0.0333 | Recall@60: 0.3333 | AP@60: 0.0128
 QUERY: AILA_Q10   | Precision@60: 0.0333 | Recall@60: 0.2500 | AP@60: 0.0110
 QUERY: AILA_Q11   | Precision@60: 0.0833 | Recall@60: 0.8333 | AP@60: 0.0949
