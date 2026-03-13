@@ -123,7 +123,7 @@ class AgenticLayer:
         response = self.client.chat.completions.create(
             model=OLLAMA_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.1
         )
         return response.choices[0].message.content.strip(), source_list
     except Exception as e:
